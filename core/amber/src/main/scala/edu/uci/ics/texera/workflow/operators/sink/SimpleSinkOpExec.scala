@@ -13,17 +13,18 @@ class SimpleSinkOpExec extends ITupleSinkOperatorExecutor {
   val results: mutable.MutableList[ITuple] = mutable.MutableList()
 
   def getResultTuples(): Array[ITuple] = {
-//    val file = new File("tweetsOutput.csv")
-//    val bw = new BufferedWriter(new FileWriter(file))
-//    bw.write("bounding_box, sentiment")
-//    for (tuple <- results) {
-//      val bounding_box = tuple.asInstanceOf[Tuple].getField[String]("bounding_box")
-//      val sentiment = tuple.asInstanceOf[Tuple].getField[Int]("sentiment")
-//      bw.write(bounding_box + ", " + sentiment)
-//      bw.newLine()
-//    }
-//    bw.flush()
-//    bw.close()
+    val file = new File("tweetsOutput.csv")
+    val bw = new BufferedWriter(new FileWriter(file))
+    bw.write("bounding_box,sentiment")
+    bw.newLine()
+    for (tuple <- results) {
+      val bounding_box = tuple.asInstanceOf[Tuple].getField[String]("bounding_box")
+      val sentiment = tuple.asInstanceOf[Tuple].getField[Int]("sentiment")
+      bw.write("\"" + bounding_box + "\"," + sentiment)
+      bw.newLine()
+    }
+    bw.flush()
+    bw.close()
     results.toArray
   }
 

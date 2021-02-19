@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ElementRef, ViewChild } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { FormlyFieldConfig, FormlyFormOptions } from '@ngx-formly/core';
 import { FormlyJsonschema } from '@ngx-formly/core/json-schema';
@@ -15,6 +15,11 @@ import { CustomJSONSchema7 } from '../../types/custom-json-schema.interface';
 import { ExecutionState } from '../../types/execute-workflow.interface';
 import { Breakpoint, OperatorPredicate } from '../../types/workflow-common.interface';
 import { SchemaPropagationService } from '../../service/dynamic-schema/schema-propagation/schema-propagation.service';
+import { JSONSchema7 } from 'json-schema';
+import { PresetKey } from 'src/app/common/formly/preset-wrapper/preset-wrapper.component';
+import { DictionaryService } from 'src/app/common/service/user/user-dictionary/dictionary.service';
+import { OperatorMetadataService } from '../../service/operator-metadata/operator-metadata.service';
+import { Preset, PresetService } from '../../service/preset/preset.service';
 
 /**
  * PropertyEditorComponent is the panel that allows user to edit operator properties.
@@ -39,6 +44,11 @@ import { SchemaPropagationService } from '../../service/dynamic-schema/schema-pr
  *
  * @author Zuozhi Wang
  */
+
+type FormContext = {
+  type: 'operator' | 'breakpoint',
+  operator?: OperatorPredicate
+};
 @Component({
   selector: 'texera-property-editor',
   templateUrl: './property-editor.component.html',
@@ -85,6 +95,15 @@ export class PropertyEditorComponent {
   // show TypeInformation only when operator type is TypeCasting
   public showTypeCastingTypeInformation = false;
 
+  @ViewChild('promptSavePresetDialogButton') promptSaveDialogButton?: ElementRef;
+  public presetData = {
+    hasPresetFields: false,
+    showPrompt: false,
+    resolvePrompt: (ok: boolean) => { },
+    promptResult: Promise.resolve(false),
+    originalPreset: <null|Preset>null,
+  };
+
   // used to fill in default values in json schema to initialize new operator
   private ajv = new Ajv({useDefaults: true});
 
@@ -93,7 +112,10 @@ export class PropertyEditorComponent {
     public workflowActionService: WorkflowActionService,
     public autocompleteService: DynamicSchemaService,
     public executeWorkflowService: ExecuteWorkflowService,
-    private schemaPropagationService: SchemaPropagationService
+    private schemaPropagationService: SchemaPropagationService,
+    private operatorMetadataService: OperatorMetadataService,
+    private dictionaryService: DictionaryService,
+    private presetService: PresetService,
   ) {
     // listen to the autocomplete event, remove invalid properties, and update the schema displayed on the form
     this.handleOperatorSchemaChange();
@@ -110,6 +132,8 @@ export class PropertyEditorComponent {
 
     this.handleDisableEditorInteractivity();
 
+    // handle applying presets
+    this.handleApplyPreset();
   }
 
   /**
@@ -150,7 +174,7 @@ export class PropertyEditorComponent {
       this.workflowActionService.removeLinkBreakpoint(this.currentLinkID);
       this.workflowActionService.getJointGraphWrapper().unhighlightLinks(this.currentLinkID);
     }
-    this.clearPropertyEditor();
+    this.resetPropertyEditor();
   }
 
   public allowChangeOperatorLogic() {
@@ -175,6 +199,44 @@ export class PropertyEditorComponent {
     }
   }
 
+  public promptSavePreset(): Promise<boolean> {
+    console.log('prompt', this);
+    this.presetData.promptResult = new Promise<boolean>((_resolve) => {
+      this.presetData.resolvePrompt = _resolve;
+    });
+    this.presetData.promptResult.then((value: boolean) => {
+      console.log('Resolve ', value);
+      this.presetData.showPrompt = false;
+      if (value) {
+        this.SaveOperatorPresets();
+      }
+    });
+    this.presetData.showPrompt = true;
+    this.promptSaveDialogButton?.nativeElement.click();
+    return this.presetData.promptResult;
+  }
+
+  public SaveOperatorPresets() {
+    if (this.currentOperatorID === undefined || this.formData === undefined) {
+      throw Error(`Attempted to save operator presets when formData is undefined and there is no current operator`);
+    }
+    const operatorType = this.autocompleteService.getDynamicSchema(this.currentOperatorID).operatorType;
+    const newPreset = this.getPresetFromForm(operatorType, this.formData);
+    const presets = this.presetService.getPresets('operator', operatorType).slice(); // shallow copy
+    console.log('sv', Object.assign(this), newPreset);
+
+    if (this.presetData.originalPreset !== null && this.getPresetIndex(this.presetData.originalPreset, presets) !== -1 &&
+      this.isValidNewOperatorPreset(newPreset, this.currentOperatorID)) {
+
+      presets[this.getPresetIndex(this.presetData.originalPreset, presets)] = newPreset;
+      this.presetService.savePresets('operator', operatorType, presets);
+
+    } else if (this.isValidNewOperatorPreset(newPreset, this.currentOperatorID)) {
+      presets.push(newPreset);
+      this.presetService.savePresets('operator', operatorType, presets);
+    }
+  }
+
   /**
    * Hides the form and clears all the data of the current the property editor
    */
@@ -189,6 +251,40 @@ export class PropertyEditorComponent {
     this.formData = undefined;
     this.formlyFields = undefined;
     this.formTitle = undefined;
+    this.presetData.hasPresetFields = false;
+    this.presetData.originalPreset = null;
+  }
+
+  public async resetPropertyEditor() {
+    const form_is_dirty = this.formlyFields !== undefined && !this.formlyFields[0].formControl?.pristine;
+    const has_preset_fields = this.presetData.hasPresetFields;
+    const form_preset_is_valid = this.currentOperatorID !== undefined && has_preset_fields &&
+      this.isValidOperatorPreset(
+        this.getPresetFromForm(
+          this.autocompleteService.getDynamicSchema(this.currentOperatorID).operatorType,
+          this.formData),
+        this.currentOperatorID);
+
+    const save_presets = has_preset_fields && form_is_dirty && form_preset_is_valid;
+    const form_has_new_preset = form_preset_is_valid && this.currentOperatorID !== undefined &&
+      this.getPresetIndex(
+        this.getPresetFromForm(this.autocompleteService.getDynamicSchema(this.currentOperatorID).operatorType, this.formData),
+        this.presetService.getPresets('operator', this.autocompleteService.getDynamicSchema(this.currentOperatorID).operatorType)) === -1 &&
+      this.presetData.originalPreset === null;
+
+    console.log('formd', save_presets, form_has_new_preset);
+
+    if (save_presets) {
+      if (form_has_new_preset) {
+        await this.promptSavePreset();
+        this.clearPropertyEditor();
+      } else {
+        this.SaveOperatorPresets();
+        this.clearPropertyEditor();
+      }
+    } else {
+      this.clearPropertyEditor();
+    }
   }
 
   public showBreakpointEditor(linkID: string): void {
@@ -223,7 +319,7 @@ export class PropertyEditorComponent {
     // set the operator data needed
     this.currentOperatorID = operator.operatorID;
     const currentOperatorSchema = this.autocompleteService.getDynamicSchema(this.currentOperatorID);
-    this.setFormlyFormBinding(currentOperatorSchema.jsonSchema);
+    this.setFormlyFormBinding(currentOperatorSchema.jsonSchema, <FormContext>{type: 'operator', operator: operator});
     this.formTitle = currentOperatorSchema.additionalMetadata.userFriendlyName;
 
     /**
@@ -231,6 +327,12 @@ export class PropertyEditorComponent {
      * Prevent the form directly changes the value in the texera graph without going through workflow action service.
      */
     this.formData = cloneDeep(operator.operatorProperties);
+    if (this.presetData.hasPresetFields) {
+      const startingPreset = this.getPresetFromForm(operator.operatorType, this.formData);
+      if (this.getPresetIndex(startingPreset, this.presetService.getPresets('operator', operator.operatorType)) !== -1) {
+        this.presetData.originalPreset = startingPreset;
+      }
+    }
 
     // use ajv to initialize the default value to data according to schema, see https://ajv.js.org/#assigning-defaults
     // WorkflowUtil service also makes sure that the default values are filled in when operator is added from the UI
@@ -279,7 +381,6 @@ export class PropertyEditorComponent {
       .filter(formData => modelCheck(formData))
       // share() because the original observable is a hot observable
       .share();
-
   }
 
   private checkOperatorProperty(formData: object): boolean {
@@ -389,6 +490,17 @@ export class PropertyEditorComponent {
     });
   }
 
+  private handleApplyPreset(): void {
+    this.presetService.applyPresetStream.subscribe({
+      next: (applyEvent) => {
+        if ( this.currentOperatorID !== undefined && this.currentOperatorID === applyEvent.target &&
+          this.isValidOperatorPreset(applyEvent.preset, this.currentOperatorID)) {
+          this.presetData.originalPreset = applyEvent.preset;
+        }
+      }
+    });
+  }
+
   /**
    * This method changes the property editor according to how operators are highlighted on the workflow editor.
    *
@@ -404,25 +516,26 @@ export class PropertyEditorComponent {
       this.workflowActionService.getJointGraphWrapper().getJointGroupUnhighlightStream(),
       this.workflowActionService.getJointGraphWrapper().getLinkHighlightStream(),
       this.workflowActionService.getJointGraphWrapper().getLinkUnhighlightStream()
-    ).subscribe(() => {
+    ).subscribe(async () => {
       const highlightedOperators = this.workflowActionService.getJointGraphWrapper().getCurrentHighlightedOperatorIDs();
       const highlightedGroups = this.workflowActionService.getJointGraphWrapper().getCurrentHighlightedGroupIDs();
       const highlightLinks = this.workflowActionService.getJointGraphWrapper().getCurrentHighlightedLinkIDs();
 
       if (highlightedOperators.length === 1 && highlightedGroups.length === 0 && highlightLinks.length === 0) {
         const operator = this.workflowActionService.getTexeraGraph().getOperator(highlightedOperators[0]);
-        this.clearPropertyEditor();
+        await this.resetPropertyEditor();
         this.showOperatorPropertyEditor(operator);
       } else if (highlightLinks.length === 1 && highlightedGroups.length === 0 && highlightedOperators.length === 0) {
-        this.clearPropertyEditor();
+        await this.resetPropertyEditor();
         this.showBreakpointEditor(highlightLinks[0]);
       } else {
-        this.clearPropertyEditor();
+        await this.resetPropertyEditor();
       }
     });
   }
 
-  private setFormlyFormBinding(schema: CustomJSONSchema7) {
+  private setFormlyFormBinding(schema: CustomJSONSchema7, context?: FormContext) {
+
     // intercept JsonSchema -> FormlySchema process, adding custom options
     // this requires a one-to-one mapping.
     // for relational custom options, have to do it after FormlySchema is generated.
@@ -432,6 +545,31 @@ export class PropertyEditorComponent {
         if (mappedField.type) {
           mappedField.type = 'codearea';
         }
+      }
+
+      if (
+        context !== undefined &&
+        context.type === 'operator' &&
+        context.operator !== undefined &&
+        (mapSource as any).autofill  !== undefined) {
+
+        mappedField.wrappers = ['form-field', 'preset-wrapper']; // wrap form field in default theme and then autofill wrapper
+        if (mappedField.templateOptions === undefined) {
+          mappedField.templateOptions = {
+            presetKey: <PresetKey> {
+              presetType: context.type,
+              saveTarget: context.operator.operatorType,
+              applyTarget: context.operator.operatorID
+            }
+          };
+        } else {
+          mappedField.templateOptions.presetKey = <PresetKey> {
+            presetType: context.type,
+            saveTarget: context.operator.operatorType,
+            applyTarget: context.operator.operatorID
+          };
+        }
+        this.presetData.hasPresetFields = true;
       }
       return mappedField;
     };
@@ -510,5 +648,54 @@ export class PropertyEditorComponent {
     : FormlyFieldConfig | undefined {
     return fields.filter((field, _, __) => field.key === fieldName)[0];
   }
+  private isValidOperatorPreset(preset: Preset, operatorID: string): boolean {
+    const presetSchema = WorkflowActionService.getOperatorPresetSchema(this.autocompleteService.getDynamicSchema(operatorID).jsonSchema);
+    const fitsSchema = this.ajv.compile(presetSchema)(preset);
+    const noEmptyProperties = Object.keys(preset).every(
+      (key: string) => typeof preset !== 'string' || ((<string>preset[key]).trim()).length > 0);
 
+    return fitsSchema && noEmptyProperties;
+  }
+
+  private isValidNewOperatorPreset(preset: Preset, operatorID: string): boolean {
+    const existsAlready = this.presetService.getPresets('operator', this.autocompleteService.getDynamicSchema(operatorID).operatorType)
+      .some(existingPreset => isEqual(preset, existingPreset));
+
+    return this.isValidOperatorPreset(preset, operatorID) && !existsAlready;
+
+  }
+
+  private areValidOperatorPresets(presets: Preset[], operatorType: string) {
+    const presetSchema = WorkflowActionService.getOperatorPresetSchema(
+      this.operatorMetadataService.getOperatorSchema(operatorType).jsonSchema);
+    const schemaValidator = this.ajv.compile(presetSchema);
+
+    return presets.every(
+      (preset) =>
+        schemaValidator(preset) &&
+        Object.keys(preset).every((key: string) => typeof preset !== 'string' || ((<string>preset[key]).trim()).length > 0)
+    );
+  }
+
+  private getPresetFromForm(operatorType: string, formData: object): Preset {
+    const copy = cloneDeep(formData as Preset);
+    const presetSchema = WorkflowActionService.getOperatorPresetSchema(
+      this.operatorMetadataService.getOperatorSchema(operatorType).jsonSchema);
+    console.log(Object.assign({}, copy));
+    for (const key of Object.keys(copy)) {
+      if (!(key in (presetSchema.properties ?? {}))) {
+        delete copy[key];
+      }
+    }
+    return copy;
+  }
+
+  private getPresetIndex(preset: Preset, presets: Readonly<Preset[]>): number {
+    for (let i = 0; i < presets.length; i++) {
+      if (isEqual(presets[i], preset)) {
+        return i;
+      }
+    }
+    return -1;
+  }
 }

@@ -81,6 +81,7 @@ import { VisualizationPanelComponent } from './workspace/component/visualization
 import { WorkflowEditorComponent } from './workspace/component/workflow-editor/workflow-editor.component';
 import { WorkspaceComponent } from './workspace/component/workspace.component';
 import { ResultDownloadComponent } from './workspace/component/navigation/result-download/result-download.component';
+import { PresetWrapperComponent } from './common/formly/preset-wrapper/preset-wrapper.component';
 
 registerLocaleData(en);
 
@@ -118,6 +119,7 @@ registerLocaleData(en);
     ResultPanelToggleComponent,
     ArrayTypeComponent,
     ObjectTypeComponent,
+    PresetWrapperComponent,
     MultiSchemaTypeComponent,
     NullTypeComponent,
     VisualizationPanelComponent,
@@ -183,7 +185,6 @@ registerLocaleData(en);
     UserService,
     UserFileService,
     UserFileUploadService,
-    UserDictionaryService,
     UserDictionaryUploadService,
     {provide: NZ_I18N, useValue: en_US}
   ],

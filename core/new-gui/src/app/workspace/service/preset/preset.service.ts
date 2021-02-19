@@ -35,7 +35,7 @@ export type PresetDictionary = {
   providedIn: 'root'
 })
 export class PresetService {
-  private static DICT_PREFIX = 'Operator-Profile';
+  private static DICT_PREFIX = 'Preset';
   private static ajv = new Ajv();
   private static isPreset = PresetService.ajv.compile(PresetSchema);
   private static isPresetArray = PresetService.ajv.compile(PresetArraySchema);

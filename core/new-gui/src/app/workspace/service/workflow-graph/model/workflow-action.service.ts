@@ -1071,7 +1071,7 @@ export class WorkflowActionService {
     } else {
       copy.required = [];
       for (const key of Object.keys(copy.properties)) {
-        if (!(copy.properties[key] as any).autofill) {
+        if (!(copy.properties[key] as any)['enable-presets']) {
           delete copy.properties[key];
         } else {
           copy.required.push(key);

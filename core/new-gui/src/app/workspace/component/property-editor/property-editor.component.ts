@@ -551,9 +551,9 @@ export class PropertyEditorComponent {
         context !== undefined &&
         context.type === 'operator' &&
         context.operator !== undefined &&
-        (mapSource as any).autofill  !== undefined) {
+        mapSource['enable-presets']  !== undefined) {
 
-        mappedField.wrappers = ['form-field', 'preset-wrapper']; // wrap form field in default theme and then autofill wrapper
+        mappedField.wrappers = ['form-field', 'preset-wrapper']; // wrap form field in default theme and then preset wrapper
         if (mappedField.templateOptions === undefined) {
           mappedField.templateOptions = {
             presetKey: <PresetKey> {

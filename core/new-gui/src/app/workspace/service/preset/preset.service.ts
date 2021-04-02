@@ -106,6 +106,7 @@ export class PresetService {
     const dict = this.dictionaryService.forceGetUserDictionary();
     return new Proxy(dict, {
       get(target: UserDictionary, key: string) {
+        if (target[`${PresetService.DICT_PREFIX}-${key}`] === undefined) return undefined
         return (JSON.parse(target[`${PresetService.DICT_PREFIX}-${key}`]));
       },
       set(target: UserDictionary, key: string, value: Preset[]) {

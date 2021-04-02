@@ -29,6 +29,8 @@ import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSliderModule } from 'ng-zorro-antd/slider';
 import { NzSpaceModule } from 'ng-zorro-antd/space';
 import { NzBadgeModule } from 'ng-zorro-antd/badge';
+import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
+import { NzMessageModule } from 'ng-zorro-antd/message';
 import { FileUploadModule } from 'ng2-file-upload';
 import { NgxAceModule } from 'ngx-ace-icy';
 import { NgxJsonViewerModule } from 'ngx-json-viewer';
@@ -168,6 +170,8 @@ registerLocaleData(en);
     NzSpaceModule,
     NzBadgeModule,
     NgxAceModule,
+    NzPopconfirmModule,
+    NzMessageModule,
     MatDialogModule
   ],
   entryComponents: [

@@ -44,6 +44,7 @@ import { assertType } from 'src/app/common/util/assert';
 import { WorkflowUtilService } from '../../service/workflow-graph/util/workflow-util.service';
 import { SchemaPropagationService } from '../../service/dynamic-schema/schema-propagation/schema-propagation.service';
 import { LoggerConfig, NGXLogger, NGXLoggerHttpService, NGXMapperService } from 'ngx-logger';
+import { NzMessageModule } from 'ng-zorro-antd/message';
 
 const {marbles} = configure({run: false});
 
@@ -95,7 +96,8 @@ describe('PropertyEditorComponent', () => {
         // use formly material module instead
         FormlyMaterialModule,
         ReactiveFormsModule,
-        HttpClientTestingModule
+        HttpClientTestingModule,
+        NzMessageModule,
       ]
     })
       .compileComponents();
@@ -119,7 +121,7 @@ describe('PropertyEditorComponent', () => {
    * test if the property editor correctly receives the operator highlight stream,
    *  get the operator data (id, property, and metadata), and then display the form.
    */
-  it('should change the content of property editor from an empty panel correctly', () => {
+  it('should change the content of property editor from an empty panel correctly', fakeAsync(() => {
     const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
     console.log(workflowActionService.getTexeraGraph());
 
@@ -131,6 +133,7 @@ describe('PropertyEditorComponent', () => {
     workflowActionService.addOperator(predicate, mockPoint);
     jointGraphWrapper.highlightOperators(predicate.operatorID);
 
+    tick();
     fixture.detectChanges();
     // check variables are set correctly
     expect(component.currentOperatorID).toEqual(predicate.operatorID);
@@ -141,7 +144,7 @@ describe('PropertyEditorComponent', () => {
     const formTitleElement = fixture.debugElement.query(By.css('.texera-workspace-property-editor-title'));
     const jsonSchemaFormElement = fixture.debugElement.query(By.css('.texera-workspace-property-editor-form'));
     // check the panel title
-    expect((formTitleElement.nativeElement as HTMLElement).innerText).toEqual(
+    expect((formTitleElement.nativeNode as HTMLElement).innerText).toEqual(
       mockScanSourceSchema.additionalMetadata.userFriendlyName);
 
     // check if the form has the all the json schema property names
@@ -156,9 +159,11 @@ describe('PropertyEditorComponent', () => {
       }
     });
 
-  });
+    discardPeriodicTasks();
+  }));
 
-  it('should switch the content of property editor to another operator from the former operator correctly', () => {
+
+  it('should switch the content of property editor to another operator from the former operator correctly', fakeAsync(() => {
     const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
 
     // add two operators
@@ -167,6 +172,7 @@ describe('PropertyEditorComponent', () => {
 
     // highlight the first operator
     jointGraphWrapper.highlightOperators(mockScanPredicate.operatorID);
+    tick();
     fixture.detectChanges();
 
     // check the variables
@@ -176,6 +182,7 @@ describe('PropertyEditorComponent', () => {
 
     // highlight the second operator
     jointGraphWrapper.highlightOperators(mockResultPredicate.operatorID);
+    tick();
     fixture.detectChanges();
 
     // result operator has default values, use ajv to fill in default values
@@ -208,13 +215,14 @@ describe('PropertyEditorComponent', () => {
       }
     });
 
-  });
+    discardPeriodicTasks();
+  }));
 
   /**
    * test if the property editor correctly receives the operator unhighlight stream
    *  and displays the operator's data when it's the only highlighted operator.
    */
-  it('should switch the content of property editor to the highlighted operator correctly when only one operator is highlighted', () => {
+  it('should switch the content of property editor to the highlighted operator correctly when only one operator is highlighted', fakeAsync(() => {
     const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
 
     // add and highlight two operators, then unhighlight one of them
@@ -227,6 +235,7 @@ describe('PropertyEditorComponent', () => {
     const predicate = mockScanPredicate;
     expect(jointGraphWrapper.getCurrentHighlightedOperatorIDs()).toEqual([predicate.operatorID]);
 
+    tick();
     fixture.detectChanges();
 
     // check if the changePropertyEditor called after the operator
@@ -249,7 +258,9 @@ describe('PropertyEditorComponent', () => {
     Object.keys(mockScanSourceSchema.jsonSchema.properties!).forEach((propertyName) => {
       expect((jsonSchemaFormElement.nativeElement as HTMLElement).innerHTML).toContain(propertyName);
     });
-  });
+
+    discardPeriodicTasks();
+  }));
 
   /**
    * test if the property editor correctly receives the operator unhighlight stream
@@ -314,6 +325,8 @@ describe('PropertyEditorComponent', () => {
     //  variables in property editor component is set correctly
     workflowActionService.addOperator(mockScanPredicate, mockPoint);
     jointGraphWrapper.highlightOperators(mockScanPredicate.operatorID);
+
+    tick();
 
     // stimulate a form change by the user
     const formChangeValue = {tableName: 'twitter_sample'};
@@ -393,6 +406,8 @@ describe('PropertyEditorComponent', () => {
     workflowActionService.setOperatorProperty(mockScanPredicate.operatorID, mockOperatorProperty);
     jointGraphWrapper.highlightOperators(mockScanPredicate.operatorID);
 
+    tick();
+
     // stimulate a form change with the same property
     component.onFormChanges(mockOperatorProperty);
 
@@ -420,7 +435,7 @@ describe('PropertyEditorComponent', () => {
       environment.linkBreakpointEnabled = false;
     });
 
-    it('should change the content of property editor from an empty panel to breakpoint editor correctly', () => {
+    it('should change the content of property editor from an empty panel to breakpoint editor correctly', fakeAsync(() => {
       const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
 
       workflowActionService.addOperator(mockScanPredicate, mockPoint);
@@ -429,6 +444,7 @@ describe('PropertyEditorComponent', () => {
 
       jointGraphWrapper.highlightLink(mockScanResultLink.linkID);
 
+      tick();
       fixture.detectChanges();
 
       // check variables are set correctly
@@ -442,9 +458,11 @@ describe('PropertyEditorComponent', () => {
         assertType<{ type: string, title: string }>(property);
         expect((jsonSchemaFormElement.nativeElement as HTMLElement).innerHTML).toContain(property.title);
       });
-    });
 
-    it('should switch the content of property editor to another link-breakpoint from the former link-breakpoint correctly', () => {
+      discardPeriodicTasks();
+    }));
+
+    it('should switch the content of property editor to another link-breakpoint from the former link-breakpoint correctly', fakeAsync(() => {
       const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
 
       workflowActionService.addOperator(mockScanPredicate, mockPoint);
@@ -455,6 +473,7 @@ describe('PropertyEditorComponent', () => {
 
       // highlight the first link
       jointGraphWrapper.highlightLink(mockScanSentimentLink.linkID);
+      tick();
       fixture.detectChanges();
 
       // check the variables
@@ -462,6 +481,7 @@ describe('PropertyEditorComponent', () => {
 
       // highlight the second link
       jointGraphWrapper.highlightLink(mockSentimentResultLink.linkID);
+      tick();
       fixture.detectChanges();
 
       expect(component.currentLinkID).toEqual(mockSentimentResultLink.linkID);
@@ -474,9 +494,11 @@ describe('PropertyEditorComponent', () => {
         assertType<{ type: string, title: string }>(property);
         expect((jsonSchemaFormElement.nativeElement as HTMLElement).innerHTML).toContain(property.title);
       });
-    });
 
-    it('should switch the content of property editor between link-breakpoint and a operator correctly', () => {
+      discardPeriodicTasks();
+    }));
+
+    it('should switch the content of property editor between link-breakpoint and a operator correctly', fakeAsync(() => {
       const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
 
       workflowActionService.addOperator(mockScanPredicate, mockPoint);
@@ -485,6 +507,7 @@ describe('PropertyEditorComponent', () => {
 
       // highlight the operator
       jointGraphWrapper.highlightOperators(mockScanPredicate.operatorID);
+      tick();
       fixture.detectChanges();
 
       // check the variables
@@ -493,6 +516,7 @@ describe('PropertyEditorComponent', () => {
 
       // highlight the link
       jointGraphWrapper.highlightLink(mockScanResultLink.linkID);
+      tick();
       fixture.detectChanges();
 
       // check the variables
@@ -502,6 +526,7 @@ describe('PropertyEditorComponent', () => {
 
       // highlight the operator again
       jointGraphWrapper.highlightOperators(mockScanPredicate.operatorID);
+      tick();
       fixture.detectChanges();
 
       // check the variables
@@ -509,9 +534,11 @@ describe('PropertyEditorComponent', () => {
       expect(component.displayForm).toBeTruthy();
 
       expect(component.currentLinkID).toBeUndefined();
-    });
 
-    it('should clear and hide the property editor panel correctly on unhighlighting an link', () => {
+      discardPeriodicTasks();
+    }));
+
+    it('should clear and hide the property editor panel correctly on unhighlighting an link', fakeAsync(() => {
       const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
 
       workflowActionService.addOperator(mockScanPredicate, mockPoint);
@@ -519,11 +546,13 @@ describe('PropertyEditorComponent', () => {
       workflowActionService.addLink(mockScanResultLink);
 
       jointGraphWrapper.highlightLink(mockScanResultLink.linkID);
+      tick();
       fixture.detectChanges();
 
       expect(component.currentLinkID).toEqual(mockScanResultLink.linkID);
       // unhighlight the highlighted link
       jointGraphWrapper.unhighlightLink(mockScanResultLink.linkID);
+      tick();
       fixture.detectChanges();
 
       expect(component.currentLinkID).toBeUndefined();
@@ -534,9 +563,11 @@ describe('PropertyEditorComponent', () => {
 
       expect(formTitleElement).toBeFalsy();
       expect(jsonSchemaFormElement).toBeFalsy();
-    });
 
-    it('should add a breakpoint when clicking add breakpoint', () => {
+      discardPeriodicTasks();
+    }));
+
+    it('should add a breakpoint when clicking add breakpoint', fakeAsync(() => {
       const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
 
       // for some reason, all the breakpoint interaction buttons (add, modify, remove) are class 'breakpointRemoveButton' ???
@@ -548,6 +579,7 @@ describe('PropertyEditorComponent', () => {
       workflowActionService.addLink(mockScanResultLink);
 
       jointGraphWrapper.highlightLink(mockScanResultLink.linkID);
+      tick();
       fixture.detectChanges();
 
       // after adding breakpoint, this should be the addbreakpoint button
@@ -559,9 +591,10 @@ describe('PropertyEditorComponent', () => {
       buttonState.triggerEventHandler('click', null);
       expect(workflowActionService.setLinkBreakpoint).toHaveBeenCalledTimes(1);
 
-    });
+      discardPeriodicTasks();
+    }));
 
-    it('should clear and hide the property editor panel correctly on clicking the remove button on breakpoint editor', () => {
+    it('should clear and hide the property editor panel correctly on clicking the remove button on breakpoint editor', fakeAsync(() => {
       const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
 
       // for some reason, all the breakpoint interaction buttons (add, modify, remove) are class 'breakpointRemoveButton' ???
@@ -573,6 +606,7 @@ describe('PropertyEditorComponent', () => {
       workflowActionService.addLink(mockScanResultLink);
 
       jointGraphWrapper.highlightLink(mockScanResultLink.linkID);
+      tick();
       fixture.detectChanges();
 
       // simulate adding a breakpoint
@@ -593,7 +627,9 @@ describe('PropertyEditorComponent', () => {
 
       expect(formTitleElement).toBeFalsy();
       expect(jsonSchemaFormElement).toBeFalsy();
-    });
+
+      discardPeriodicTasks();
+    }));
 
     // xit('should change Texera graph link-breakpoint property correctly when the breakpoint form is edited by the user', fakeAsync(() => {
     //   const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
@@ -627,7 +663,7 @@ describe('PropertyEditorComponent', () => {
     //   expect(emitEventCounter).toEqual(1);
     // }));
 
-    it('should remove Texera graph link-breakpoint property correctly when the breakpoint remove button is clicked', () => {
+    it('should remove Texera graph link-breakpoint property correctly when the breakpoint remove button is clicked', fakeAsync(() => {
       const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
 
       // add a link and highligh the link so that the
@@ -636,6 +672,7 @@ describe('PropertyEditorComponent', () => {
       workflowActionService.addOperator(mockResultPredicate, mockPoint);
       workflowActionService.addLink(mockScanResultLink);
       jointGraphWrapper.highlightLink(mockScanResultLink.linkID);
+      tick();
       fixture.detectChanges();
 
       const formData = {count: 100};
@@ -660,7 +697,9 @@ describe('PropertyEditorComponent', () => {
 
       linkBreakpoint = workflowActionService.getTexeraGraph().getLinkBreakpoint(mockScanResultLink.linkID);
       expect(linkBreakpoint).toBeUndefined();
-    });
+
+      discardPeriodicTasks();
+    }));
 
     // xit('should debounce the user breakpoint form input to avoid emitting event too frequently', marbles(m => {
     //   const jointGraphWrapper = workflowActionService.getJointGraphWrapper();

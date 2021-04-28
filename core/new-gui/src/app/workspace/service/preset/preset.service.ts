@@ -1,13 +1,12 @@
 import { Injectable } from '@angular/core';
-import * as ajv from 'ajv';
 import * as Ajv from 'ajv';
 import { JSONSchema7 } from 'json-schema';
 import { cloneDeep, isEqual, merge } from 'lodash';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { Observable, Subject } from 'rxjs';
-import { DictionaryService, UserDictionary } from 'src/app/common/service/user/user-dictionary/dictionary.service';
-import { OperatorPredicate } from '../../types/workflow-common.interface';
-import { DynamicSchemaService } from '../dynamic-schema/dynamic-schema.service';
+import { DictionaryService } from 'src/app/common/service/user/user-dictionary/dictionary.service';
+import { asType, isType } from 'src/app/common/util/assert';
+import { CustomJSONSchema7 } from '../../types/custom-json-schema.interface';
 import { OperatorMetadataService } from '../operator-metadata/operator-metadata.service';
 import { WorkflowActionService } from '../workflow-graph/model/workflow-action.service';
 
@@ -103,32 +102,45 @@ export class PresetService {
   }
 
   private getPresetDict(): PresetDictionary {
+    const presetService = this;
     const dict = this.dictionaryService.forceGetUserDictionary();
-    return new Proxy(dict, {
-      get(target: UserDictionary, key: string) {
-        if (target[`${PresetService.DICT_PREFIX}-${key}`] === undefined) return undefined
-        return (JSON.parse(target[`${PresetService.DICT_PREFIX}-${key}`]));
+    return new Proxy({}, {
+      get(_, key: string | symbol) {
+        if (!isType(key, 'string')) throw Error("Preset entries must have string keys");
+        if (dict[`${PresetService.DICT_PREFIX}-${key}`] === undefined) return undefined
+        const presets = JSON.parse(dict[`${PresetService.DICT_PREFIX}-${key}`])
+        if (!presetService.isPresetArray(presets)) throw Error(`Expected preset dict to contain a Preset[] but instead got ${presets}`);
+        return presets;
       },
-      set(target: UserDictionary, key: string, value: Preset[]) {
-        target[`${PresetService.DICT_PREFIX}-${key}`] = JSON.stringify(value);
+      set(_, key: string | symbol, value: any) {
+        if (!isType(key, 'string')) throw Error("Preset entries must have string keys");
+        if (!presetService.isPresetArray(value)) throw Error(`Preset entries must have Preset[] values`);
+        dict[`${PresetService.DICT_PREFIX}-${key}`] = JSON.stringify(value);
         return true;
       },
-      deleteProperty(target: UserDictionary, key: string) {
-        delete target[`${PresetService.DICT_PREFIX}-${key}`];
+      deleteProperty(_, key: string) {
+        if (!isType(key, 'string')) throw Error("Preset entries must have string keys");
+        delete dict[`${PresetService.DICT_PREFIX}-${key}`];
         return true;
       },
-      defineProperty(target: UserDictionary, key: string, attr: PropertyDescriptor) {
-        target[`${PresetService.DICT_PREFIX}-${key}`] = JSON.stringify(attr.value);
+      defineProperty(_, key: string, attr: PropertyDescriptor) {
+        if (!isType(key, 'string')) throw Error("Preset entries must have string keys");
+        if (!presetService.isPresetArray(attr.value)) throw Error(`Preset entries must have Preset[] values`);
+        dict[`${PresetService.DICT_PREFIX}-${key}`] = JSON.stringify(attr.value);
         return true;
       },
-      has(target: UserDictionary, key: string) {
-        return `${PresetService.DICT_PREFIX}-${key}` in target;
+      has(_, key: string) {
+        return `${PresetService.DICT_PREFIX}-${key}` in dict;
       },
-    }) as unknown as PresetDictionary;
+    });
+  }
+
+  private isPreset(presets: any[]): presets is Preset[] {
+    return asType(PresetService.isPreset(presets), 'boolean');
   }
 
   private isPresetArray(presets: any[]): presets is Preset[] {
-    return (PresetService.isPresetArray(presets) as boolean)
+    return asType(PresetService.isPresetArray(presets), 'boolean');
   }
 
   private displaySavePresetMessage(messageType: AlertMessageType, displayMessage?: string|null) {
@@ -183,20 +195,19 @@ export class PresetService {
     });
   }
 
-  public static getOperatorPresetSchema(operatorSchema: JSONSchema7): JSONSchema7 {
+  public static getOperatorPresetSchema(operatorSchema: CustomJSONSchema7): CustomJSONSchema7 {
     const copy = cloneDeep(operatorSchema);
-    if (copy.properties === undefined) {
-      throw new Error(`provided operator schema ${operatorSchema} has no properties`);
-    } else {
-      copy.required = [];
-      for (const key of Object.keys(copy.properties)) {
-        if (!(copy.properties[key] as any)['enable-presets']) {
-          delete copy.properties[key];
-        } else {
-          copy.required.push(key);
-        }
+    if (copy.properties === undefined) throw new Error(`provided operator schema ${operatorSchema} has no properties`);
+
+    copy.required = [];
+    for (const key of Object.keys(copy.properties)) {
+      let properties = copy.properties[key]
+      if (isType(properties, 'boolean') || !properties['enable-presets']) {
+        delete copy.properties[key];
+      } else {
+        copy.required.push(key);
       }
-      return copy;
     }
+    return copy;
   }
 }

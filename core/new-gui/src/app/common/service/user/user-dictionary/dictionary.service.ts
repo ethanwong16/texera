@@ -6,6 +6,7 @@ import { AppSettings } from 'src/app/common/app-setting';
 import { JSONSchema7 } from 'json-schema';
 import { catchError, map, shareReplay } from 'rxjs/operators';
 import { isEqual } from 'lodash';
+import { isType } from 'src/app/common/util/assert';
 
 /**
  * User-Dictionary service stores and retrieves string key-value pairs on a per-user basis
@@ -323,7 +324,7 @@ export class DictionaryService {
 
     // getAll automatically creates a dictionaryEvent that updates the localdict with the remote
     this.getAll().subscribe({
-      next: () => {this.ready.value = true; resolveReady(true); console.log("ready",this.getUserDictionary())},
+      next: () => {this.ready.value = true; resolveReady(true);},
       error: (error: Error) => {
         // user not logged in - print error but continue
         if (error.message === "Invalid session") console.error(error);
@@ -386,17 +387,20 @@ export class DictionaryService {
   private generateProxyHandler(): ProxyHandler<UserDictionary> {
     const dictionaryService = this;
     return {
-      set(localUserDictionary: Readonly<UserDictionary>, key: string, value: string) {
-        console.log("set", key, value)
+      set(localUserDictionary: Readonly<UserDictionary>, key: string | symbol, value: any) {
+        if (!isType(key, 'string')) throw Error("Dictionary entries must have string keys");
+        if (!isType(value, 'string')) throw Error("Dictionary entries must have string values");
         dictionaryService.set(key, value);
         return true;
       },
-      deleteProperty(localUserDictionary: Readonly<UserDictionary>, key: string) {
+      deleteProperty(localUserDictionary: Readonly<UserDictionary>, key: string | symbol) {
+        if (!isType(key, 'string')) throw Error("Dictionary entries must have string keys");
         dictionaryService.delete(key);
         return true
       },
-      defineProperty(localUserDictionary: Readonly<UserDictionary>, key: string, attributes: PropertyDescriptor) {
-        console.log("set", key, attributes.value)
+      defineProperty(localUserDictionary: Readonly<UserDictionary>, key: string | symbol, attributes: PropertyDescriptor) {
+        if (!isType(key, 'string')) throw Error("Dictionary entries must have string keys");
+        if (attributes.value == undefined || !isType(attributes.value, 'string')) throw Error("Dictionary entries must have string values");
         dictionaryService.set(key, attributes.value);
         return true;
       }
@@ -411,7 +415,7 @@ export class DictionaryService {
    * @returns 
    */
   private handleErrorResponse(response: Error): Observable<never> {
-    if (!(response instanceof HttpErrorResponse)) return Observable.throwError(response);
+    if (!(isType(response, HttpErrorResponse))) return Observable.throwError(response);
     if (DictionaryService.isErrorResponse(response.error)) return Observable.throwError(new Error(response.error.message));
     return Observable.throwError(new TypeError(`expected ErrorResponse but server replied with: ${response.error}`));
   }

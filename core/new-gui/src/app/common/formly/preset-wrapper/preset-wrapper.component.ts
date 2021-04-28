@@ -1,16 +1,8 @@
-import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
-import { Field, FieldType, FieldWrapper, FormlyFieldConfig } from '@ngx-formly/core';
-import {ɵa} from '@ngx-formly/material/form-field';
-import * as Ajv from 'ajv';
-import { JSONSchema7 } from 'json-schema';
-import { PropertyEditorComponent } from 'src/app/workspace/component/property-editor/property-editor.component';
-import { DictionaryService, NotReadyError, UserDictionary } from '../../service/user/user-dictionary/dictionary.service';
-import { merge, cloneDeep, isEqual } from 'lodash';
-import { Observable, Subject } from 'rxjs';
-import { assertType } from '../../util/assert';
-import { NzMessageService } from 'ng-zorro-antd/message';
+import { Component, OnInit } from '@angular/core';
+import { FieldWrapper } from '@ngx-formly/core';
+import { cloneDeep, isEqual } from 'lodash';
 import { Preset, PresetService } from 'src/app/workspace/service/preset/preset.service';
-import { OperatorPredicate } from 'src/app/workspace/types/workflow-common.interface';
+import { asType } from '../../util/assert';
 
 export interface PresetKey {
   presetType: string;
@@ -44,7 +36,7 @@ export class PresetWrapperComponent extends FieldWrapper implements OnInit {
     }
     const presetKey = <PresetKey> this.field.templateOptions.presetKey;
 
-    this.fieldKey = this.field.key as string;
+    this.fieldKey = asType(this.field.key,'string');
     this.searchTerm = this.formControl.value !== null ? this.formControl.value : '';
     this.presetType = presetKey.presetType;
     this.saveTarget =  presetKey.saveTarget;

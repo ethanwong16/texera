@@ -53,8 +53,8 @@ class SortOpFinalExec(
           if(num<=n){num=n} else {
             increasing = false
           }
-          println(s"Final Layer increasing = ${increasing.toString()}")
         }
+        println(s"Final Layer increasing = ${increasing.toString()}")
         result = Iterator()
         for (sortedList <- sortedListsConcat) {
           result = result ++ sortedList.toIterator

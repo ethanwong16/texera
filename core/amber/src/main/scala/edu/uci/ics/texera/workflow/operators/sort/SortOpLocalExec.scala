@@ -52,9 +52,9 @@ class SortOpLocalExec(
 
     var num = -1f
     var increasing = true
-    val it = tuplesFromSkewedWorker.toIterator
-    while (it.hasNext) {
-      val n = it.next().getField(sortAttributeName).asInstanceOf[Float]
+    //val it = tuplesFromSkewedWorker.toIterator
+    while (tuplesFromSkewedWorker.size>0) {
+      val n = tuplesFromSkewedWorker.dequeue().getField(sortAttributeName).asInstanceOf[Float]
       if(num<=n){num=n} else {
         println(s"num=${num}, n=${n}, increasing=false")
         increasing =false

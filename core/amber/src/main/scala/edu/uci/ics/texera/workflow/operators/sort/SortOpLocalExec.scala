@@ -50,15 +50,8 @@ class SortOpLocalExec(
     var count = 1
     var curr = new ArrayBuffer[Float]
 
-    var num = -1f
-    var increasing = true
-    //val it = tuplesFromSkewedWorker.toIterator
     while (tuplesFromSkewedWorker.size>0) {
       val n = tuplesFromSkewedWorker.dequeue().getField(sortAttributeName).asInstanceOf[Float]
-      if(num<=n){num=n} else {
-        println(s"num=${num}, n=${n}, increasing=false")
-        increasing =false
-      }
       curr.append(n)
       if (count % Constants.eachTransferredListSize == 0) {
         sendingLists.append(curr)
@@ -206,17 +199,6 @@ class SortOpLocalExec(
           println(s"\t PRODUCED ${sortedTuples.size}")
           outputOneList(sortedTuples)
         } else {
-          var num = -1f
-          var increasing = true
-          var inRange = true
-          receivedFromFreeWorker.foreach(n => {
-            if(num<=n){num =n} else {
-              println(s"num=${num}, n=${n}")
-              increasing=false
-            }
-            if(n<workerLowerLimitIncluded || n>=workerUpperLimitExcluded){inRange=false}
-          })
-          println(s"Skewed Worker increasing = ${increasing.toString()}, InRange=${inRange.toString()}")
           println(s"\t PRODUCED ${sortedTuples.size + receivedFromFreeWorker.size}")
           outputMergedLists(sortedTuples, receivedFromFreeWorker)
         }

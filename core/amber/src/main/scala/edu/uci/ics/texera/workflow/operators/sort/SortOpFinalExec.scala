@@ -46,7 +46,16 @@ class SortOpFinalExec(
         for (sortedList <- sortedListsConcat) {
           result = result ++ sortedList.toIterator
         }
-        result
+        var increasing = true
+        var num = -1f
+        while(result.hasNext){
+          val n = result.next().getField(sortAttributeName).asInstanceOf[Float]
+          if(num<=n){num=n} else {
+            increasing = false
+          }
+          println(s"Final Layer increasing = ${increasing.toString()}")
+        }
+        Iterator()
     }
   }
 

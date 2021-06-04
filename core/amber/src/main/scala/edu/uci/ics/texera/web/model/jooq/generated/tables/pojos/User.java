@@ -15,7 +15,7 @@ import org.jooq.types.UInteger;
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
 public class User implements IUser {
 
-    private static final long serialVersionUID = -644617017;
+    private static final long serialVersionUID = -1398058851;
 
     private String   name;
     private UInteger uid;

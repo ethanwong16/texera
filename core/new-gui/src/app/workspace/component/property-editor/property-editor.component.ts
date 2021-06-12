@@ -1,9 +1,9 @@
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { FormlyFieldConfig, FormlyFormOptions } from '@ngx-formly/core';
 import { FormlyJsonschema } from '@ngx-formly/core/json-schema';
 import * as Ajv from 'ajv';
-import { cloneDeep, every, findIndex, isEqual, some, values} from 'lodash';
+import { cloneDeep, every, findIndex, isEqual } from 'lodash';
 import { Observable } from 'rxjs/Observable';
 import { Subject } from 'rxjs/Subject';
 import { PresetWrapperComponent } from 'src/app/common/formly/preset-wrapper/preset-wrapper.component';
@@ -16,10 +16,11 @@ import { CustomJSONSchema7 } from '../../types/custom-json-schema.interface';
 import { ExecutionState } from '../../types/execute-workflow.interface';
 import { OperatorPredicate } from '../../types/workflow-common.interface';
 import { SchemaPropagationService } from '../../service/dynamic-schema/schema-propagation/schema-propagation.service';
-import { DictionaryService } from 'src/app/common/service/user/user-dictionary/dictionary.service';
 import { OperatorMetadataService } from '../../service/operator-metadata/operator-metadata.service';
 import { Preset, PresetService } from '../../service/preset/preset.service';
-import { nonNull } from 'src/app/common/util/assert';
+import { isType, nonNull } from 'src/app/common/util/assert';
+import { takeUntil } from 'rxjs/operators';
+import { ReplaySubject } from 'rxjs';
 
 /**
  * PropertyEditorComponent is the panel that allows user to edit operator properties.
@@ -45,6 +46,10 @@ import { nonNull } from 'src/app/common/util/assert';
  * @author Zuozhi Wang
  */
 
+/**
+ * optional arguments for setFormlyFormBinding. 
+ * enables presets in property-editor if type = 'operator' and operatorPredicate is provided
+ */
 type FormContext = {
   type: 'operator' | 'breakpoint',
   operator?: OperatorPredicate
@@ -54,7 +59,7 @@ type FormContext = {
   templateUrl: './property-editor.component.html',
   styleUrls: ['./property-editor.component.scss']
 })
-export class PropertyEditorComponent {
+export class PropertyEditorComponent implements OnDestroy {
 
   // debounce time for form input in milliseconds
   //  please set this to multiples of 10 to make writing tests easy
@@ -95,6 +100,7 @@ export class PropertyEditorComponent {
   // show TypeInformation only when operator type is TypeCasting
   public showTypeCastingTypeInformation = false;
 
+  // vars used in form preset feature. TODO: separate this logic into it's own mini-service
   @ViewChild('promptSavePresetDialogButton') promptSaveDialogButton?: ElementRef<HTMLAnchorElement>;
   public presetContext = {
     hasPresetFields: false,
@@ -106,6 +112,8 @@ export class PropertyEditorComponent {
 
   // used to fill in default values in json schema to initialize new operator
   private ajv = new Ajv({useDefaults: true});
+  // used to tear down subscriptions that takeUntil(teardownObservable)
+  private teardownObservable: ReplaySubject<boolean> = new ReplaySubject(1);
 
   constructor(
     public formlyJsonschema: FormlyJsonschema,
@@ -114,7 +122,6 @@ export class PropertyEditorComponent {
     public executeWorkflowService: ExecuteWorkflowService,
     private schemaPropagationService: SchemaPropagationService,
     private operatorMetadataService: OperatorMetadataService,
-    private dictionaryService: DictionaryService,
     private presetService: PresetService,
   ) {
     // listen to the autocomplete event, remove invalid properties, and update the schema displayed on the form
@@ -220,30 +227,30 @@ export class PropertyEditorComponent {
     return this.presetContext.promptResult;
   }
 
+  /**
+   * attempts to save current property editor form data as an operator preset
+   */
   public saveOperatorPresets() {
-    if (this.currentOperatorID === undefined || this.formData === undefined) {
-      throw Error(`Attempted to save operator presets when formData is undefined or there is no current operator`);
+    if (this.currentOperatorID === undefined || this.formData === undefined || this.presetContext.hasPresetFields === false) {
+      throw Error(`Attempted to save operator preset when no preset is available`);
     }
-    const operatorType = this.autocompleteService.getDynamicSchema(this.currentOperatorID).operatorType;
+
+    const operatorType = this.operatorMetadataService.getOperatorSchema(
+      this.workflowActionService.getTexeraGraph().getOperator(this.currentOperatorID).operatorType)
+      .operatorType;
     const newPreset = this.filterPresetFromForm(operatorType, this.formData);
-    const presets = this.presetService.getPresets('operator', operatorType).slice(); // shallow copy
+    let presets = this.presetService.getPresets('operator', operatorType).slice(); // shallow copy
 
-    const preset_is_valid = newPreset !== null && this.presetService.isValidOperatorPreset(newPreset, this.currentOperatorID);
-    const preset_is_an_edit = this.presetContext.originalPreset !== null;
+    const preset_is_valid = this.presetService.isValidOperatorPreset(newPreset, this.currentOperatorID);
     const preset_is_not_a_repeat = every(presets, preset => !isEqual(preset, newPreset));
+    const preset_is_an_edit = this.presetContext.originalPreset !== null;
 
-    if (!preset_is_valid) {
-      throw Error(`Attempted to save invalid preset ${newPreset}`);
-    } else if (!preset_is_not_a_repeat) {
-      throw Error(`Attempted to save preset ${newPreset} that already exists`);
-    } else if (preset_is_valid && preset_is_not_a_repeat && preset_is_an_edit) {
-      const oldPresetIndex = findIndex(presets, (preset) => isEqual(preset, this.presetContext.originalPreset));
-      presets[oldPresetIndex] = newPreset;
-      this.presetService.savePresets('operator', operatorType, presets);
-    } else if (preset_is_valid && preset_is_not_a_repeat && !preset_is_an_edit) {
-      presets.push(newPreset);
-      this.presetService.savePresets('operator', operatorType, presets);
-    }
+    if (!preset_is_valid) throw Error(`Attempted to save invalid preset ${newPreset}`);
+    if (!preset_is_not_a_repeat) throw Error(`Attempted to save preset ${newPreset} that already exists`);
+    if (preset_is_an_edit) presets = presets.filter(preset => !isEqual(preset, this.presetContext.originalPreset));
+
+    presets.push(newPreset);
+    this.presetService.savePresets('operator', operatorType, presets);
   }
 
   /**
@@ -264,28 +271,28 @@ export class PropertyEditorComponent {
     this.presetContext.originalPreset = null;
   }
 
+  /**
+   * resets PropertyEditor so that something else can be edited
+   * If it was editing an operator, check if a preset was should be created/saved
+   */
   public async resetPropertyEditor() {
     const form_is_dirty = this.formlyFields !== undefined && this.formlyFields.some(field => field.formControl?.dirty);
     const form_has_preset_fields = this.presetContext.hasPresetFields;
+    const form_preset_is_an_edit = this.presetContext.originalPreset !== null;
     const form_preset_is_valid = this.currentOperatorID !== undefined && form_has_preset_fields &&
       this.presetService.isValidNewOperatorPreset(
         this.filterPresetFromForm(
-          this.autocompleteService.getDynamicSchema(this.currentOperatorID).operatorType,
+          this.operatorMetadataService.getOperatorSchema( // there should be an easier way to get operator schema from operator ID, but I don't know how
+            this.workflowActionService.getTexeraGraph().getOperator(this.currentOperatorID).operatorType)
+            .operatorType,
           this.formData),
         this.currentOperatorID);
-    const form_preset_is_an_edit = this.presetContext.originalPreset !== null;
 
-    if (form_has_preset_fields && form_is_dirty && form_preset_is_valid) {
-      if (!form_preset_is_an_edit) {
-        await this.promptSavePreset();
-        this.clearPropertyEditor();
-      } else {
-        this.saveOperatorPresets();
-        this.clearPropertyEditor();
-      }
-    } else {
-      this.clearPropertyEditor();
+    if (this.presetService.ready.value === true && form_has_preset_fields && form_is_dirty && form_preset_is_valid) {
+      if (form_preset_is_an_edit) this.saveOperatorPresets();
+      else await this.promptSavePreset(); // form preset is novel, prompt user to save it
     }
+    this.clearPropertyEditor();
   }
 
   public showBreakpointEditor(linkID: string): void {
@@ -331,7 +338,7 @@ export class PropertyEditorComponent {
 
     // if form has preset fields, setup presetContext
     const form_has_preset_fields = Object.values(nonNull(currentOperatorSchema.jsonSchema.properties))
-      .some((property) => (property as CustomJSONSchema7)['enable-presets']);
+      .some((property) => (!isType(property, 'boolean') && property['enable-presets']));
     if (form_has_preset_fields) {
       const startingPreset = this.filterPresetFromForm(operator.operatorType, this.formData);
       const presets = this.presetService.getPresets('operator', operator.operatorType);
@@ -388,6 +395,15 @@ export class PropertyEditorComponent {
       .filter(formData => modelCheck(formData))
       // share() because the original observable is a hot observable
       .share();
+  }
+
+  /**
+   * called when service is destroyed by angular.
+   * tears down subscriptions that takeUntil(teardownObservable)
+   */
+  public ngOnDestroy() {
+    this.teardownObservable.next(true);
+    this.teardownObservable.complete();
   }
 
   private checkOperatorProperty(formData: object): boolean {
@@ -498,7 +514,7 @@ export class PropertyEditorComponent {
   }
 
   private handleApplyPreset(): void {
-    this.presetService.applyPresetStream.subscribe({
+    this.presetService.applyPresetStream.pipe(takeUntil(this.teardownObservable)).subscribe({
       next: (applyEvent) => {
         if ( this.currentOperatorID !== undefined && this.currentOperatorID === applyEvent.target &&
           this.presetService.isValidOperatorPreset(applyEvent.preset, this.currentOperatorID)) {
@@ -541,6 +557,11 @@ export class PropertyEditorComponent {
     });
   }
 
+  /**
+   * Use a json schema to configure the formly form
+   * @param schema representing the form's structure
+   * @param context *optional* Proper FormContext enables the use of form presets via PresetService
+   */
   private setFormlyFormBinding(schema: CustomJSONSchema7, context?: FormContext) {
     // intercept JsonSchema -> FormlySchema process, adding custom options
     // this requires a one-to-one mapping.
@@ -553,7 +574,9 @@ export class PropertyEditorComponent {
         }
       }
 
+      // if presetService is ready and operator property allows presets, setup formly field to display presets
       if (
+        this.presetService.ready.value === true &&
         context !== undefined &&
         context.type === 'operator' &&
         context.operator !== undefined &&
@@ -638,6 +661,12 @@ export class PropertyEditorComponent {
     return fields.filter((field, _, __) => field.key === fieldName)[0];
   }
 
+  /**
+   * Filters formData to only include members that are in the preset schema of the given operatorType
+   * @param operatorType 
+   * @param formData 
+   * @returns partially finished Preset. use PresetService.isValidOperatorPreset to verify all preset attributes exist
+   */
   private filterPresetFromForm(operatorType: string, formData: object): Preset {
     return PresetService.filterOperatorPresetProperties(
       this.operatorMetadataService.getOperatorSchema(operatorType).jsonSchema,

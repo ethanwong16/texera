@@ -43,8 +43,8 @@ describe('PresetService', () => {
     // handle dict initialization
     const testDict = { a: 'a', b: 'b', c: 'c' };
     const dictApiEndpoint = `${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}`;
-    const req = httpMock.expectOne(`${dictApiEndpoint}/get`);
-    req.flush({code: 1, result: testDict});
+    httpMock.expectOne(`${AppSettings.getApiEndpoint()}/users/auth/status`).flush({name: "testUser", uid: 1}); // allow autologin by userService
+    httpMock.expectOne(`${dictApiEndpoint}/get`).flush({code: 1, result: testDict});
     httpMock.verify();
     tick();
   }));
@@ -87,6 +87,67 @@ describe('PresetService', () => {
         .toEqual(JSON.stringify([{testPresetKey: 'testPresetValue'}]));
     }));
 
+    it('should save amended entry to user dictionary when a preset is deleted', fakeAsync(() => {
+      const userDictionaryService = TestBed.inject(DictionaryService);
+      const dictApiEndpoint = `${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}`;
+      const presetDictKey = `${(PresetService as any).DICT_PREFIX}-testType-testTarget`
+      const initialPresets = [{testPresetKey: 'testPresetValue'}, {testPresetKey: 'testPresetValue2'}]
+      const endPresets = initialPresets.slice(0,1);
+
+      presetService.savePresets('testType', 'testTarget', initialPresets);
+      let savePresetReq = httpMock.expectOne(`${dictApiEndpoint}/set`);
+      savePresetReq.flush({code: 2, result: 'arbitrary confirmation message'});
+      httpMock.verify();
+      tick();
+      flush();
+
+      expect(userDictionaryService.getUserDictionary()[presetDictKey])
+      .toEqual(JSON.stringify(initialPresets));
+
+      presetService.deletePreset('testType', 'testTarget', initialPresets[1]);
+      savePresetReq = httpMock.expectOne(`${dictApiEndpoint}/set`);
+      expect(savePresetReq.cancelled).toBeFalsy();
+      expect(savePresetReq.request.method).toEqual('POST');
+      expect(savePresetReq.request.responseType).toEqual('json');
+      savePresetReq.flush({code: 2, result: 'arbitrary confirmation message'});
+      httpMock.verify();
+      tick();
+      flush();
+      expect(userDictionaryService.getUserDictionary()[presetDictKey])
+        .toEqual(JSON.stringify(endPresets));
+    }));
+
+    it('should save amended entry to user dictionary when a preset is updated', fakeAsync(() => {
+      const userDictionaryService = TestBed.inject(DictionaryService);
+      const dictApiEndpoint = `${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}`;
+      const presetDictKey = `${(PresetService as any).DICT_PREFIX}-testType-testTarget`
+      const initialPresets = [{testPresetKey: 'testPresetValue'}, {testPresetKey: 'testPresetValue2'}]
+      const updatedPreset = {testPresetKey: 'testPresetValue3'}
+      const endPresets = [initialPresets[0], updatedPreset]
+
+      presetService.savePresets('testType', 'testTarget', initialPresets);
+      let savePresetReq = httpMock.expectOne(`${dictApiEndpoint}/set`);
+      savePresetReq.flush({code: 2, result: 'arbitrary confirmation message'});
+      httpMock.verify();
+      tick();
+      flush();
+
+      expect(userDictionaryService.getUserDictionary()[presetDictKey])
+      .toEqual(JSON.stringify(initialPresets));
+
+      presetService.updatePreset('testType', 'testTarget', initialPresets[1], updatedPreset);
+      savePresetReq = httpMock.expectOne(`${dictApiEndpoint}/set`);
+      expect(savePresetReq.cancelled).toBeFalsy();
+      expect(savePresetReq.request.method).toEqual('POST');
+      expect(savePresetReq.request.responseType).toEqual('json');
+      savePresetReq.flush({code: 2, result: 'arbitrary confirmation message'});
+      httpMock.verify();
+      tick();
+      flush();
+      expect(userDictionaryService.getUserDictionary()[presetDictKey])
+        .toEqual(JSON.stringify(endPresets));
+    }));
+
     it('should delete from dictionary service when empty preset list is saved', fakeAsync(() => {
       const userDictionaryService = TestBed.inject(DictionaryService);
       const dictApiEndpoint = `${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}`;
@@ -103,6 +164,7 @@ describe('PresetService', () => {
         .toBeUndefined();
       flush();
     }));
+    
 
     it('should get user presets from the user dictionary', fakeAsync(() => {
       const userDictionaryService = TestBed.inject(DictionaryService);

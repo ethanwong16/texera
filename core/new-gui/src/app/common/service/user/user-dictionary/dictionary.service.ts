@@ -1,15 +1,17 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { from, Observable, Subject } from 'rxjs';
+import { Injectable, OnDestroy } from '@angular/core';
+import { from, Observable, ReplaySubject, Subject } from 'rxjs';
 import * as Ajv from 'ajv';
 import { AppSettings } from 'src/app/common/app-setting';
 import { JSONSchema7 } from 'json-schema';
-import { catchError, map, shareReplay } from 'rxjs/operators';
+import { catchError, map, shareReplay, takeUntil } from 'rxjs/operators';
 import { isEqual } from 'lodash';
 import { isType } from 'src/app/common/util/assert';
+import { UserService } from '../user.service';
+import { User } from 'src/app/common/type/user';
 
 /**
- * User-Dictionary service stores and retrieves string key-value pairs on a per-user basis
+ * Dictionary service stores and retrieves string key-value pairs on a per-user basis
  * It uses a mysql table on the backend side and requires the client to be logged in
  * @author Albert Liu
  */
@@ -162,7 +164,7 @@ export class NotReadyError extends Error {
 @Injectable({
   providedIn: 'root'
 })
-export class DictionaryService {
+export class DictionaryService implements OnDestroy {
   public static readonly USER_DICTIONARY_ENDPOINT =  'users/dictionary';
   private static ajv = new Ajv({useDefaults: true});
   private static validateErrorResponse = DictionaryService.ajv.compile(errorResponseSchema);
@@ -170,13 +172,18 @@ export class DictionaryService {
   private static validateDictResponse = DictionaryService.ajv.compile(dictResponseSchema);
   private static validateConfirmationResponse = DictionaryService.ajv.compile(confirmationResponseSchema);
 
+  public ready: {promise: Promise<boolean>, value: boolean} = {promise: Promise.resolve(false), value: false};
   private dictionaryEventSubject = new Subject<USER_DICT_EVENT>();
   private localUserDictionary: UserDictionary = {}; // asynchronously initialized after construction (see initLocalDict)
-  private ready: {promise: Promise<boolean>, value: boolean} = {promise: Promise.resolve(false), value: false};
+  private teardownObservable: ReplaySubject<boolean> = new ReplaySubject(1);  // observable used OnDestroy to tear down subscriptions that takeUntil(teardownObservable)
 
-  constructor(private http: HttpClient) {
+  constructor(
+    private http: HttpClient,
+    private userService: UserService,
+    ) {
     this.initLocalDict();
     this.handleDictionaryEventStream();
+    this.handleChangeUser();
   }
 
   /**
@@ -315,23 +322,49 @@ export class DictionaryService {
   }
 
   /**
+   * called when service is destroyed by angular.
+   * tears down subscriptions that takeUntil(teardownObservable)
+   */
+  public ngOnDestroy() {
+    this.teardownObservable.next(true);
+    this.teardownObservable.complete();
+  }
+
+  /**
    * initializes proxy dictionaries by calling getAll() and then setting dictionaryService.ready state
    */
   private initLocalDict() {
+    if (!this.userService.isLogin()) { 
+      console.warn("[DictionaryService]: Initialization halted: user not logged in");
+      return;
+    }
+
     let resolveReady: (read: boolean) => void;
 
-    this.ready = { promise: new Promise((resolvefunc) => resolveReady = resolvefunc), value: false };
+    this.ready.promise = new Promise((resolvefunc) => resolveReady = resolvefunc);
+    this.ready.value = false;
 
     // getAll automatically creates a dictionaryEvent that updates the localdict with the remote
     this.getAll().subscribe({
       next: () => {this.ready.value = true; resolveReady(true);},
       error: (error: Error) => {
+        resolveReady(false);
         // user not logged in - print error but continue
-        if (error.message === "Invalid session") console.error(error);
+        if (error.message === "Invalid session") console.warn("[DictionaryService]: Initialization halted: user not logged in");
         else throw error;
       },
     });
+  }
 
+  /**
+   * resets local copy of userDictionary
+   */
+  private resetLocalDict() {
+    // setting this.localUserDictionary = {} would change the pointer to a new object
+    // but not change the underlying object (which is referenced in each proxy dictionary)
+    for (const key in this.localUserDictionary) {
+      delete this.localUserDictionary[key];
+    }
   }
 
   /**
@@ -344,7 +377,7 @@ export class DictionaryService {
         case EVENT_TYPE.GET:
           if (event.key in this.localUserDictionary &&
             this.localUserDictionary[event.key] !== event.value) {
-            console.warn(`[user-dictionary service] Dictionary desynchronized at key "${event.key}": locally had ${this.localUserDictionary[event.key]} but remote reported  ${event.value}`);
+            console.warn(`[DictionaryService] Dictionary desynchronized at key "${event.key}": locally had ${this.localUserDictionary[event.key]} but remote reported  ${event.value}`);
           }
           this.localUserDictionary[event.key] = event.value;
           break;
@@ -358,16 +391,27 @@ export class DictionaryService {
           break;
 
         case EVENT_TYPE.GET_ALL:
-          if (!isEqual(this.localUserDictionary, event.value) && !isEqual(this.localUserDictionary, {})) {
-            console.warn(`[user-dictionary service] Dictionary was desynchronized, local had ${this.localUserDictionary}, but remote reported ${event.value}`);
-          }
-          // setting this.localUserDictionary = event.value would not
-          // change the references to this.localUserDictionary used in all proxy dictionaries
-          for (const key in this.localUserDictionary) {
-            delete this.localUserDictionary[key];
-          }
+          if (!isEqual(this.localUserDictionary, event.value) && !isEqual(this.localUserDictionary, {}))
+            console.warn(`[DictionaryService] Dictionary was desynchronized, local had ${this.localUserDictionary}, but remote reported ${event.value}`);
+          this.resetLocalDict();
           Object.assign(this.localUserDictionary, event.value);
       }
+    });
+  }
+
+  /**
+   * attempt to initialize dictionary service whenever the user logs in and clears it when the user logs out.
+   */
+  private handleChangeUser() {
+    this.userService.userChanged().pipe(takeUntil(this.teardownObservable)).subscribe({
+      next: (user: User | undefined) => {
+        if (user !== undefined) {
+          this.ready.promise = Promise.resolve(false);
+          this.ready.value = false;
+          this.resetLocalDict();
+          this.initLocalDict();
+        }
+      },
     });
   }
 

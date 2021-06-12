@@ -1,18 +1,15 @@
-import { Overlay, OverlayContainer } from '@angular/cdk/overlay';
 import { CommonModule } from '@angular/common';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { Component, ViewChild } from '@angular/core';
-import { async, ComponentFixture, fakeAsync, flush, flushMicrotasks, inject, TestBed, tick } from '@angular/core/testing';
+import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { BrowserModule, By } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
 import { FormlyMaterialModule } from '@ngx-formly/material';
-import { FormlyMatDatepickerModule } from '@ngx-formly/material/datepicker';
-import { drop, isEqual } from 'lodash';
 import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
 import { NzMenuModule } from 'ng-zorro-antd/menu';
-import { NzMessageModule, NzMessageServiceModule } from 'ng-zorro-antd/message';
+import { NzMessageModule } from 'ng-zorro-antd/message';
 import { PresetService } from 'src/app/workspace/service/preset/preset.service';
 import { CustomNgMaterialModule } from '../../custom-ng-material.module';
 import { nonNull } from '../../util/assert';
@@ -28,6 +25,10 @@ const presetKey = {
   applyTarget: 'testPresetApplyTarget'
 };
 
+/**
+ * This mock component creates a formly form so that Formly api
+ * can be used to generate a form with the PresetWrapperComponent
+ */
 @Component({
   selector: 'texera-preset-test-cmp',
   template: `
@@ -90,22 +91,22 @@ describe('PresetWrapperComponent', () => {
     it('should properly apply a preset', () => {
       const presetService = TestBed.inject(PresetService);
       spyOn(presetService, 'applyPreset');
+
       component.applyPreset(testPreset);
       expect(presetService.applyPreset).toHaveBeenCalledOnceWith(presetKey.presetType, presetKey.applyTarget, testPreset);
     });
 
     it('should properly delete a preset', () => {
       const presetService = TestBed.inject(PresetService);
-      const otherPreset = {testkey: 'otherPresetValue', otherkey: 'otherPresetValue2'};
+      const otherPreset = {testkey: 'otherPresetValue2', otherkey: 'otherPresetValue2'};
       const existingPresets = [testPreset, otherPreset];
-      const remainingPresets = [otherPreset];
       spyOn(presetService, 'getPresets').and.returnValue(existingPresets);
-      const savePresets = spyOn(presetService, 'savePresets');
+      const deletePreset = spyOn(presetService, 'deletePreset');
 
       component.deletePreset(testPreset);
-      expect(presetService.savePresets).toHaveBeenCalledTimes(1);
-      expect(savePresets.calls.mostRecent().args.slice(0, 3))
-        .toEqual([presetKey.presetType, presetKey.saveTarget, remainingPresets]);
+      expect(deletePreset).toHaveBeenCalledTimes(1);
+      expect(deletePreset.calls.mostRecent().args.slice(0, 3))
+        .toEqual([presetKey.presetType, presetKey.saveTarget, testPreset]);
     });
 
     it('should properly generate a preset title', () => {
@@ -136,6 +137,7 @@ describe('PresetWrapperComponent', () => {
       spyOn(component, 'getSearchResults').and.returnValue([testPreset]);
 
       expect(component.searchResults).toEqual([]);
+      // trigger nzVisibleChange, as if the dropdown menu was triggered
       debugElement.query(By.css('.preset-field')).triggerEventHandler('nzVisibleChange', true);
       fixture.detectChanges();
       expect(component.searchResults).toEqual([testPreset]);
@@ -147,7 +149,8 @@ describe('PresetWrapperComponent', () => {
       fixture.detectChanges();
       component = fixture.debugElement.query(By.directive(PresetWrapperComponent)).componentInstance;
 
-      const searchResults = [testPreset, testPreset];
+      const otherPreset = {testkey: 'otherPresetValue2', otherkey: 'otherPresetValue2'};
+      const searchResults = [testPreset, otherPreset];
       const debugElement = fixture.debugElement.query(By.directive(PresetWrapperComponent));
 
       // trigger dropdown menu
@@ -159,10 +162,15 @@ describe('PresetWrapperComponent', () => {
 
       const dropdown = nonNull(document.body.querySelector('.preset-menu'));
       expect(dropdown.childElementCount).toEqual(component.searchResults.length);
-      dropdown.querySelectorAll('li').forEach(node => {
-        expect(node.querySelector('.title')?.innerHTML).toEqual(component.getEntryTitle(testPreset));
-        expect(node.querySelector('.description')?.innerHTML).toEqual(component.getEntryDescription(testPreset));
-      });
+
+      // check that title and description of each dropdown entry match their preset
+      const nodes = dropdown.querySelectorAll('li')
+      for (let i = 0; i < dropdown.childElementCount; i++) {
+        let node = nodes[i]
+        let preset = searchResults[i];
+        expect(node.querySelector('.title')?.innerHTML).toEqual(component.getEntryTitle(preset));
+        expect(node.querySelector('.description')?.innerHTML).toEqual(component.getEntryDescription(preset));
+      }
     }));
 
     it('should apply the preset if a preset entry is clicked', fakeAsync(() => {
@@ -206,6 +214,7 @@ describe('PresetWrapperComponent', () => {
       tick(1000);
       fixture.detectChanges();
 
+      // press delete button
       const dropdown = nonNull(document.body.querySelector('.preset-menu'));
       const dropdownDeleteButton = nonNull(dropdown.querySelector('.delete-button'));
       expect(dropdown.childElementCount).toEqual(component.searchResults.length);
@@ -213,7 +222,7 @@ describe('PresetWrapperComponent', () => {
       expect(component.deletePreset).toHaveBeenCalledOnceWith(testPreset);
     }));
 
-    it('should set new search results whenever the value of the field changes', () => {
+    it('should set new search results whenever the value of the field changes', fakeAsync(() => {
       const inputfield = fixture.debugElement.query(By.css('.preset-field input')).nativeElement;
       const searchResults = [testPreset];
       spyOn(component, 'getSearchResults').and.returnValue(searchResults);
@@ -221,7 +230,8 @@ describe('PresetWrapperComponent', () => {
       // trigger input event as if typing
       inputfield.value = 'asdf';
       inputfield.dispatchEvent(new Event('input'));
+      tick(1000);
       expect(component.searchResults).toEqual(searchResults);
-    });
+    }));
   });
 });

@@ -31,7 +31,7 @@ import { TEXERA_FORMLY_CONFIG } from 'src/app/common/formly/formly-config';
 import { FormlyMaterialModule } from '@ngx-formly/material';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ExecuteWorkflowService } from '../../service/execute-workflow/execute-workflow.service';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormlyJsonschema } from '@ngx-formly/core/json-schema';
 import { ArrayTypeComponent } from 'src/app/common/formly/array.type';
@@ -52,6 +52,8 @@ import { NzMenuModule } from 'ng-zorro-antd/menu';
 import { PresetWrapperComponent } from 'src/app/common/formly/preset-wrapper/preset-wrapper.component';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { PresetService } from '../../service/preset/preset.service';
+import { DictionaryService } from 'src/app/common/service/user/user-dictionary/dictionary.service';
+import { AppSettings } from 'src/app/common/app-setting';
 
 const {marbles} = configure({run: false});
 
@@ -439,17 +441,25 @@ describe('PropertyEditorComponent', () => {
 
   describe('preset handling', () => {
     let presetService: PresetService;
+    let httpMock: HttpTestingController;
     beforeEach(() => {
       presetService = TestBed.inject(PresetService);
+      httpMock = TestBed.inject(HttpTestingController);
+      httpMock.expectOne(`${AppSettings.getApiEndpoint()}/users/auth/status`).flush({name: "testUser", uid: 1}); // allow autologin by userService
+      httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`)
+        .flush({code: 1, result: { a: 'a', b: 'b', c: 'c' }});
+      httpMock.verify();
     });
 
     it('should prompt the user to save a preset', fakeAsync(() => {
       const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
 
+      // add operator with valid preset, then test the save prompt
       workflowActionService.addOperator(mockPresetEnabledPredicate, mockPoint);
       jointGraphWrapper.highlightOperators(mockPresetEnabledPredicate.operatorID);
       component.promptSavePreset();
       tick(1000);
+      // ant-popover is the css class of the dialog box
       expect(document.body.querySelector('.ant-popover')).toBeTruthy();
     }));
 
@@ -457,11 +467,13 @@ describe('PropertyEditorComponent', () => {
       const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
       spyOn(component, 'saveOperatorPresets');
 
+      // add operator with valid preset, then test the save prompt
       workflowActionService.addOperator(mockPresetEnabledPredicate, mockPoint);
       jointGraphWrapper.highlightOperators(mockPresetEnabledPredicate.operatorID);
       component.promptSavePreset();
       tick(1000);
 
+      // confirm save preset then check if dialog disappeared
       const dialog = nonNull(document.body.querySelector('.ant-popover'));
       const submitBtn = nonNull(dialog.querySelector('.ant-btn-primary'));
       submitBtn.dispatchEvent(new Event('click'));
@@ -477,11 +489,13 @@ describe('PropertyEditorComponent', () => {
       const jointGraphWrapper = workflowActionService.getJointGraphWrapper();
       spyOn(component, 'saveOperatorPresets');
 
+      // add operator with valid preset, then test the save prompt
       workflowActionService.addOperator(mockPresetEnabledPredicate, mockPoint);
       jointGraphWrapper.highlightOperators(mockPresetEnabledPredicate.operatorID);
       component.promptSavePreset();
       tick(1000);
 
+      // reject prompt, check if dialog disappeared
       const dialog = nonNull(document.body.querySelector('.ant-popover'));
       const cancelBtn = nonNull(dialog.querySelector('.ant-btn'));
       cancelBtn.dispatchEvent(new Event('click'));
@@ -500,12 +514,16 @@ describe('PropertyEditorComponent', () => {
     it('should not save operator presets if the preset is unchanged from original', fakeAsync(() => {
       const preset = {presetProperty: 'testPresetProperty'};
       const testPredicate = merge(cloneDeep(mockPresetEnabledPredicate), {operatorProperties: preset});
+      // make sure this preset already exists in preset service
       const getPresets = spyOn(presetService, 'getPresets').and.returnValue([preset]);
 
-      workflowActionService.addOperator(testPredicate, mockPoint);
+      // add operator with pre-existing preset, then test the save prompt
+      workflowActionService.addOperator(merge(testPredicate, preset), mockPoint);
       tick(1000);
       expect(component.presetContext.originalPreset).toBeTruthy();
       getPresets.calls.reset();
+
+      // should throw since no changes to the preset were made
       expect(() => component.saveOperatorPresets()).toThrow();
       expect(presetService.getPresets).toHaveBeenCalledOnceWith('operator', testPredicate.operatorType);
     }));
@@ -514,29 +532,36 @@ describe('PropertyEditorComponent', () => {
       const oldPreset = {presetProperty: 'oldTestPresetProperty'};
       const newPreset = {presetProperty: 'newTestPresetProperty'};
       const testPredicate = merge(cloneDeep(mockPresetEnabledPredicate), {operatorProperties: oldPreset});
+      // make sure old preset exists in preset service
       const getPresets = spyOn(presetService, 'getPresets').and.returnValue([oldPreset]);
       spyOn(presetService, 'savePresets');
 
-      workflowActionService.addOperator(testPredicate, mockPoint);
+      // add operator with valid preset. This starting preset becomes the "original"
+      // when saving changes, property editor should overwrite the original
+      workflowActionService.addOperator(merge(testPredicate, oldPreset), mockPoint);
       tick(1000);
       flush();
-      merge(component.formData, newPreset);
-      expect(component.presetContext.originalPreset).toBeTruthy();
+      merge(component.formData, newPreset); // alter preset
+      expect(component.presetContext.originalPreset).toBeTruthy(); // original preset exists
       getPresets.calls.reset();
-      expect(() => component.saveOperatorPresets()).not.toThrow();
+      expect(() => component.saveOperatorPresets()).not.toThrow(); // should succeed since new preset doesn't match old
       expect(presetService.getPresets).toHaveBeenCalledOnceWith('operator', testPredicate.operatorType);
-      expect(presetService.savePresets).toHaveBeenCalledOnceWith('operator', testPredicate.operatorType, [newPreset]);
+      // should properly extract new preset from form data
+      expect(presetService.savePresets).toHaveBeenCalledOnceWith('operator', testPredicate.operatorType, [newPreset]); 
     }));
 
-    it('should save and replace a preset if it was applied and then edited', fakeAsync(() => {
+    it('should update a preset if it was applied and then edited', fakeAsync(() => {
       const oldPreset = {presetProperty: 'oldTestPresetProperty'};
       const newPreset = {presetProperty: 'newTestPresetProperty'};
       const testPredicate = cloneDeep(mockPresetEnabledPredicate);
       const getPresets = spyOn(presetService, 'getPresets').and.returnValue([oldPreset]);
       spyOn(presetService, 'savePresets');
 
+      // add operator with valid preset
       workflowActionService.addOperator(testPredicate, mockPoint);
       tick(1000);
+      // once a preset is applied, it becomes the "original"
+      // when saving changes, property editor should overwrite the original
       presetService.applyPreset('operator', testPredicate.operatorID, oldPreset);
       tick(1000);
       flush();
@@ -555,6 +580,7 @@ describe('PropertyEditorComponent', () => {
       const getPresets = spyOn(presetService, 'getPresets').and.returnValue([oldPreset]);
       spyOn(presetService, 'savePresets');
 
+      // add operator with valid preset
       workflowActionService.addOperator(testPredicate, mockPoint);
       tick(1000);
       flush();

@@ -4,8 +4,14 @@ import com.fasterxml.jackson.annotation.{JsonProperty, JsonPropertyDescription}
 import com.github.tototoshi.csv.{CSVReader, DefaultCSVFormat}
 import com.kjetland.jackson.jsonSchema.annotations.JsonSchemaTitle
 import edu.uci.ics.amber.engine.operators.OpExecConfig
-import edu.uci.ics.texera.workflow.common.tuple.schema.{Attribute, AttributeType, Schema}
+import edu.uci.ics.texera.workflow.common.operators.ManyToOneOpExecConfig
 import edu.uci.ics.texera.workflow.common.tuple.schema.AttributeTypeUtils.inferSchemaFromRows
+import edu.uci.ics.texera.workflow.common.tuple.schema.{
+  Attribute,
+  AttributeType,
+  OperatorSchemaInfo,
+  Schema
+}
 import edu.uci.ics.texera.workflow.operators.source.scan.ScanSourceOpDesc
 import org.codehaus.jackson.map.annotate.JsonDeserialize
 
@@ -28,21 +34,14 @@ class CSVScanSourceOpDesc extends ScanSourceOpDesc {
   fileTypeName = Option("CSV")
 
   @throws[IOException]
-  override def operatorExecutor: OpExecConfig = {
+  override def operatorExecutor(operatorSchemaInfo: OperatorSchemaInfo): OpExecConfig = {
     // fill in default values
     if (customDelimiter.get.isEmpty)
       customDelimiter = Option(",")
 
     filePath match {
-      case Some(path) =>
-        new CSVScanSourceOpExecConfig(
-          operatorIdentifier,
-          1, // here using 1 since there is no easy way to split the task for multi-line csv.
-          path,
-          inferSchema(),
-          customDelimiter.get.charAt(0),
-          hasHeader
-        )
+      case Some(_) =>
+        new ManyToOneOpExecConfig(operatorIdentifier, _ => new CSVScanSourceOpExec(this))
       case None =>
         throw new RuntimeException("File path is not provided.")
     }
@@ -51,14 +50,19 @@ class CSVScanSourceOpDesc extends ScanSourceOpDesc {
 
   /**
     * Infer Texera.Schema based on the top few lines of data.
+    *
     * @return Texera.Schema build for this operator
     */
   @Override
   def inferSchema(): Schema = {
-    if (customDelimiter.isEmpty) return null
+    if (customDelimiter.isEmpty) {
+      return null
+    }
+    if (filePath.isEmpty) {
+      return null
+    }
     implicit object CustomFormat extends DefaultCSVFormat {
       override val delimiter: Char = customDelimiter.get.charAt(0)
-
     }
     var reader: CSVReader = CSVReader.open(filePath.get)(CustomFormat)
     val firstRow: Array[String] = reader.iterator.next().toArray
@@ -66,12 +70,13 @@ class CSVScanSourceOpDesc extends ScanSourceOpDesc {
 
     // reopen the file to read from the beginning
     reader = CSVReader.open(filePath.get)(CustomFormat)
-    if (hasHeader)
-      reader.readNext()
 
+    val startOffset = offset.getOrElse(0) + (if (hasHeader) 1 else 0)
+    val endOffset =
+      startOffset + limit.getOrElse(INFER_READ_LIMIT).min(INFER_READ_LIMIT)
     val attributeTypeList: Array[AttributeType] = inferSchemaFromRows(
       reader.iterator
-        .take(INFER_READ_LIMIT)
+        .slice(startOffset, endOffset)
         .map(seq => seq.toArray)
     )
 

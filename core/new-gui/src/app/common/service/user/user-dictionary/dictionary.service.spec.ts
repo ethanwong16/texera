@@ -1,10 +1,9 @@
-import { HttpClient } from '@angular/common/http';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
-import { TestBed, inject, fakeAsync, tick, flush } from '@angular/core/testing';
-import { from, NEVER, Subject } from 'rxjs';
+import { fakeAsync, flush, inject, TestBed, tick } from '@angular/core/testing';
 import { AppSettings } from 'src/app/common/app-setting';
+import { DictionaryService, UserDictionary } from './dictionary.service';
 import { UserService } from '../user.service';
-import { DictionaryService, EVENT_TYPE, NotReadyError, UserDictionary, USER_DICT_EVENT } from './dictionary.service';
+import { StubUserService } from '../stub-user.service';
 
 describe('DictionaryService', () => {
   let dictionaryService: DictionaryService;
@@ -13,334 +12,108 @@ describe('DictionaryService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
-        DictionaryService,
+        { provide: UserService, useClass: StubUserService },
+        DictionaryService
       ],
       imports: [
-        HttpClientTestingModule,
+        HttpClientTestingModule
       ]
     });
 
     dictionaryService = TestBed.inject(DictionaryService);
     testDict = { a: 'a', b: 'b', c: 'c' }; // sample dictionary used throughout testing
-    TestBed.inject(HttpTestingController).expectOne(`${AppSettings.getApiEndpoint()}/users/auth/status`).flush({name: "testUser", uid: 1}); // allow autologin by userService
   });
 
   it('should be created', inject([DictionaryService], (injectedService: DictionaryService) => {
     expect(injectedService).toBeTruthy();
   }));
 
-  describe('Dictionary I/O', () => {
+  describe('Dictionary Service', () => {
 
     describe('Backend interface', () => {
       let httpMock: HttpTestingController;
-  
+      let dictEventSubjectNextSpy: jasmine.Spy;
+
       beforeEach(() => {
         httpMock = TestBed.inject(HttpTestingController);
         // handle the getAll() request created when initializing dictionaryService
-        httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`).flush({code:1, result:testDict});
+        httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}`)
+          .flush({});
+
+
+        // clear dict
+        (dictionaryService as any).updateDict({});
+
+        dictEventSubjectNextSpy = spyOn((dictionaryService as any).dictionaryChangedSubject, 'next');
+        dictEventSubjectNextSpy.calls.reset();
       });
-  
-      it("should produce a POST request when get() is called", fakeAsync(() => {
-        let testKey = "test";
-        dictionaryService.get(testKey);
+
+      it('should produce a GET request when fetchKey() is called', fakeAsync(() => {
+        const testKey = 'test';
+        dictionaryService.fetchKey(testKey);
         // get() generates a POST request to this url
-        const req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`);
+        const req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/${testKey}`);
         // POST request should have a properly formatted json payload
-        expect(req.cancelled).toBeFalsy();
-        expect(req.request.method).toEqual('POST');
+        expect(req.request.method).toEqual('GET');
         expect(req.request.responseType).toEqual('json');
-        expect(req.request.body).toEqual({requestType: 1, key: testKey});
-        req.flush({code: 0, result: "testValue"});
+        req.flush('testValue');
         flush();
         httpMock.verify();
+        expect(dictEventSubjectNextSpy).toHaveBeenCalled();
       }));
-  
-      it("should produce a POST request when getAll() is called", fakeAsync(() => {
-        dictionaryService.getAll();
+
+      it('should produce a GET request when fetchAll() is called', fakeAsync(() => {
+        dictionaryService.fetchAll();
         // getAll() generates a POST request to this url
-        const req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`);
+        const req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}`);
         // POST request should have a properly formatted json payload
         expect(req.cancelled).toBeFalsy();
-        expect(req.request.method).toEqual('POST');
+        expect(req.request.method).toEqual('GET');
         expect(req.request.responseType).toEqual('json');
-        expect(req.request.body).toEqual({ requestType: 2 });
-        req.flush({code: 1, result: testDict});
+        req.flush({ 'testkey2': 'testValue2' });
         flush();
         httpMock.verify();
+        expect(dictEventSubjectNextSpy).toHaveBeenCalled();
       }));
-  
-      it("should produce a POST request when set() is called", fakeAsync(() => {
-        let testKey = "test";
-        let testValue = "testValue";
+
+      it('should produce a PUT request when set() is called', fakeAsync(() => {
+        const testKey = 'testkey3';
+        const testValue = 'testValue3';
         dictionaryService.set(testKey, testValue);
         // set() generates a POST request to this url
-        const req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/set`);
+        const req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/${testKey}`);
         // POST request should have a properly formatted json payload
-        expect(req.cancelled).toBeFalsy();
-        expect(req.request.method).toEqual('POST');
-        expect(req.request.responseType).toEqual('json');
-        expect(req.request.body).toEqual({key: testKey, value: testValue });
-        req.flush({code: 2, result: "arbitrary confirmation message"});
+        expect(req.request.method).toEqual('PUT');
+        expect(req.request.body).toEqual({ value: testValue });
+        req.flush({});
         flush();
         httpMock.verify();
+        expect(dictEventSubjectNextSpy).toHaveBeenCalled();
       }));
-  
-      it("should produce a POST request when delete() is called", fakeAsync(() => {
-        let testKey = "test";
+
+      it('should produce a DELETE request when delete() is called', fakeAsync(() => {
+        const testKey = 'testkey4';
+        dictionaryService.set(testKey, 'testvalue4');
+        const setReq = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/${testKey}`);
+        setReq.flush({});
+        dictEventSubjectNextSpy.calls.reset();
+
         dictionaryService.delete(testKey);
         // delete() generates a DELETE request to this url
-        const req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/delete`);
+        const req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/${testKey}`);
         // DELETE request should have a properly formatted json payload
         expect(req.cancelled).toBeFalsy();
         expect(req.request.method).toEqual('DELETE');
-        expect(req.request.responseType).toEqual('json');
-        expect(req.request.body).toEqual({key: testKey});
-        req.flush({code: 2, result: "arbitrary confirmation message"});
+        req.flush({});
         flush();
         httpMock.verify();
+        expect(dictEventSubjectNextSpy).toHaveBeenCalled();
+
       }));
     });
 
-    describe('Dictionary Event Stream', () => {
-      let httpMock: HttpTestingController;
-      let dictEventSubjectNextSpy: jasmine.Spy;
-  
-      beforeEach(() => {
-        httpMock = TestBed.inject(HttpTestingController);
-        // spy on subject.next() function used to broadcast new dictionary events
-        dictEventSubjectNextSpy = spyOn((dictionaryService as any).dictionaryEventSubject, 'next');
-  
-        // handle the getAll() request created when initializing dictionaryService
-        httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`).flush({code:1, result:testDict});
-        dictEventSubjectNextSpy.calls.reset();
-      });
-  
-      it('should emit an event when get() is called', fakeAsync(() => {
-        dictionaryService.get("test")
-        // get() generates a POST request to this url
-        let req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`);
-        // fulfill request with proper output
-        req.flush({code:0, result:"testValue"});
-        tick();
-        // expect event to be emitted
-        expect(dictEventSubjectNextSpy).toHaveBeenCalledOnceWith({type: EVENT_TYPE.GET, key: 'test', value: 'testValue'});
-        dictEventSubjectNextSpy.calls.reset();
-        flush();
-        httpMock.verify();
-      }));
-  
-      it('should emit an event when getAll() is called', fakeAsync(() => {
-        dictionaryService.getAll()
-        // getAll() generates a POST request to this url
-        let req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`);
-        // fulfill request with proper output
-        req.flush({code:1, result:testDict}); 
-        tick();
-        // expect event to be emitted
-        expect(dictEventSubjectNextSpy).toHaveBeenCalledOnceWith({type: EVENT_TYPE.GET_ALL, value: testDict});
-        dictEventSubjectNextSpy.calls.reset();
-        flush();
-        httpMock.verify();
-      }));
-  
-      it('should emit an event when set() is called', fakeAsync(() => {
-        dictionaryService.set("test", "testValue")
-        // set() generates a POST request to this url
-        let req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/set`);
-        // fulfill request with proper output
-        req.flush({code:2, result:"arbitrary confirmation message"});
-        tick();
-        // expect event to be emitted
-        expect(dictEventSubjectNextSpy).toHaveBeenCalledOnceWith({type: EVENT_TYPE.SET, key: 'test', value: 'testValue'});
-        dictEventSubjectNextSpy.calls.reset();
-        flush();
-        httpMock.verify();
-      }));
-  
-      it('should emit an event when delete() is called', fakeAsync(() => {
-        dictionaryService.delete("test")
-        // delete() generates a POST request to this url
-        let req = httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/delete`);
-        // fulfill request with proper output
-        req.flush({code:2, result:"arbitrary confirmation message"});
-        tick();
-        // expect event to be emitted
-        expect(dictEventSubjectNextSpy).toHaveBeenCalledOnceWith({type: EVENT_TYPE.DELETE, key: 'test'});
-        dictEventSubjectNextSpy.calls.reset();
-        flush();
-        httpMock.verify();
-      }));
-    });
-
-    describe('Function Return Values', () => {
-      let httpMock: HttpTestingController;
-  
-      beforeEach(() => {
-        httpMock = TestBed.inject(HttpTestingController);
-        httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`).flush({code:1, result:testDict});
-      });
-  
-      it("get() should yield string value", fakeAsync(() => {
-        let testKey = "test";
-        let testValue = "testValue"
-        // get() should output testValue
-        dictionaryService.get(testKey).subscribe(x => expect(x).toEqual(testValue))
-        // fulfill request with testValue
-        httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`)
-          .flush({code: 0, result: testValue});
-        flush();
-        httpMock.verify();
-      }));
-  
-      it("getAll() should yield entire dict as an object w/ attributes as key/value pairs", fakeAsync(() => {
-        // getAll() should output testDict
-        dictionaryService.getAll().subscribe(x => expect(x).toEqual(testDict))
-        // fulfill request with testDict
-        httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`)
-          .flush({code: 1, result: testDict});
-        flush();
-        httpMock.verify();
-      }));
-  
-      it("set() should yield true after assignment", fakeAsync(() => {
-        let testKey = "test";
-        let testValue = "testValue";
-        // set() should output true when successful
-        dictionaryService.set(testKey, testValue).subscribe(x => expect(x).toEqual(true));
-        // fulfill request to indicate success
-        httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/set`)
-          .flush({code: 2, result: "arbitrary confirmation message"});
-        flush();
-        httpMock.verify();
-      }));
-  
-      it("set() should yield true after deletion", fakeAsync(() => {
-        let testKey = "test";
-        // delete() should output true when successful
-        dictionaryService.delete(testKey).subscribe(x => expect(x).toEqual(true));
-        // fulfill request to indicate success
-        httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/delete`)
-          .flush({code: 2, result: "arbitrary confirmation message"});
-        flush();
-        httpMock.verify();
-      }));
-    });
 
   });
 
-  describe('Dictionary Proxy', () => {
-    describe('Init', () => {
-      it('should throw exceptions if a dictionary is requested before initialization', () => {
-        // make sure getAll, and initialization, never finishes
-        spyOn(DictionaryService.prototype, 'getAll').and.returnValue(NEVER);
-        dictionaryService = new DictionaryService(TestBed.inject(HttpClient), TestBed.inject(UserService));
-
-        // attempt to get user dictionary
-        expect(() => dictionaryService.getUserDictionary()).toThrowError(NotReadyError);
-      });
-    
-      it('should return an empty dictionary if forced to before initialization', () => {
-        // make sure getAll, and initialization, never finishes
-        spyOn(DictionaryService.prototype, 'getAll').and.returnValue(NEVER);
-        dictionaryService = new DictionaryService(TestBed.inject(HttpClient), TestBed.inject(UserService));
-
-        // attempt to get user dictionary
-        const dictionary = dictionaryService.forceGetUserDictionary();
-        expect((Object.keys(dictionary).length)).toEqual(0);
-      });
-    
-      it('should only publish dictionary once initialized', fakeAsync(() => {
-        let gotUserDictionary = false;
-        let completeInitialization: (value: UserDictionary) => void = () => {};
-
-        // make sure getAll, and initialization, only finishes if completeInitialization is called
-        spyOn(DictionaryService.prototype, 'getAll').and.returnValue(from(new Promise<UserDictionary>((resolve) => {
-          completeInitialization = resolve;
-        })));
-        dictionaryService = new DictionaryService(TestBed.inject(HttpClient), TestBed.inject(UserService));
-
-        // setup subscription so that gotUserDictionary is only true when observable outputs the UserDictionary
-        const dictionaryPromise = dictionaryService.getUserDictionaryAsync();
-        dictionaryPromise.subscribe(() => gotUserDictionary = true);
-        tick();
-        expect(gotUserDictionary).toBeFalse();
-        completeInitialization(testDict);
-        tick();
-        expect(gotUserDictionary).toBeTrue();
-      }));
-    
-      it('should initialize the local dictionary properly', fakeAsync(() => {
-        const httpMock = TestBed.inject(HttpTestingController);
-        // handle getAll() from init of dictionaryService in beforeEach. we won't be using that
-        httpMock.expectOne(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`).flush({code: 1, result: testDict});
-
-        // reinject DictionaryService to use fakeAsync context (beforeEach wasn't in a fakeAsync zone)
-        dictionaryService = new DictionaryService(TestBed.inject(HttpClient), TestBed.inject(UserService));
-        // httpMock.expectOne(`${AppSettings.getApiEndpoint()}/users/auth/status`).flush({name: "testUser", uid: 1}); // allow autologin by userService
-
-        // complete init by fulfilling POST request generated by initial getAll()
-        const mockReq = httpMock.match(`${AppSettings.getApiEndpoint()}/${DictionaryService.USER_DICTIONARY_ENDPOINT}/get`);
-        mockReq[0].flush({code: 1, result: testDict});
-        tick();
-    
-        // expect all dictionary getters to confirm that all proxy dicts match testDict
-        let dict = dictionaryService.getUserDictionary();
-        expect(dict).toEqual(testDict);
-        dict = dictionaryService.forceGetUserDictionary();
-        expect(dict).toEqual(testDict);
-        dictionaryService.getUserDictionaryAsync().subscribe(value => expect(value).toEqual(testDict));
-        tick();
-      }));
-    });
-
-    it('Dictionary events should update the local dictionary', fakeAsync(() => {
-      const testDict = { a: 'a', b: 'b', c: 'c' };
-      const localdict = (dictionaryService as any).localUserDictionary;
-      const subject: Subject<USER_DICT_EVENT> = (dictionaryService as any).dictionaryEventSubject;
-
-      subject.next({type: EVENT_TYPE.GET_ALL, value: testDict});
-      tick();
-      expect(localdict).toEqual(testDict);
-
-      subject.next({type: EVENT_TYPE.GET, key: 'testKey', value: 'testValue'});
-      tick();
-      expect(localdict.testKey).toEqual('testValue');
-
-      subject.next({type: EVENT_TYPE.SET, key: 'testKey2', value: 'testValue2'});
-      tick();
-      expect(localdict.testKey2).toEqual('testValue2');
-
-      subject.next({type: EVENT_TYPE.DELETE, key: 'testKey2'});
-      tick();
-      expect(localdict.testKey2).toBeUndefined();
-    }));
-
-    it('Proxy dicts should stay in sync with localdict after dictionary events', fakeAsync(() => {
-      const testDict = { a: 'a', b: 'b', c: 'c' };
-      const localdict = (dictionaryService as any).localUserDictionary; // base dictionary referenced by proxy dictionaries
-      const proxyDict = dictionaryService.forceGetUserDictionary(); // proxy dict
-      const subject: Subject<USER_DICT_EVENT> = (dictionaryService as any).dictionaryEventSubject;
-
-      subject.next({type: EVENT_TYPE.GET_ALL, value: testDict});
-      tick();
-      expect(localdict).toEqual(testDict);
-      expect(proxyDict).toEqual(localdict);
-
-      subject.next({type: EVENT_TYPE.GET, key: 'testKey', value: 'testValue'});
-      tick();
-      expect(localdict.testKey).toEqual('testValue');
-      expect(proxyDict).toEqual(localdict);
-
-      subject.next({type: EVENT_TYPE.SET, key: 'testKey2', value: 'testValue2'});
-      tick();
-      expect(localdict.testKey2).toEqual('testValue2');
-      expect(proxyDict).toEqual(localdict);
-
-      subject.next({type: EVENT_TYPE.DELETE, key: 'testKey2'});
-      tick();
-      expect(localdict.testKey2).toBeUndefined();
-      expect(proxyDict).toEqual(localdict);
-    }));
-  });
 
 });

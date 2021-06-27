@@ -8,14 +8,17 @@ import edu.uci.ics.texera.workflow.common.metadata.{
   OperatorInfo,
   OutputPort
 }
-import edu.uci.ics.texera.workflow.common.metadata.annotations.AutofillAttributeName
+import edu.uci.ics.texera.workflow.common.metadata.annotations.{
+  AutofillAttributeName,
+  AutofillAttributeNameList
+}
 import edu.uci.ics.texera.workflow.common.operators.aggregate.{
   AggregateOpDesc,
   AggregateOpExecConfig,
   DistributedAggregation
 }
 import edu.uci.ics.texera.workflow.common.tuple.Tuple
-import edu.uci.ics.texera.workflow.common.tuple.schema.{AttributeType, Schema}
+import edu.uci.ics.texera.workflow.common.tuple.schema.{AttributeType, Schema, OperatorSchemaInfo}
 import edu.uci.ics.texera.workflow.common.tuple.schema.AttributeTypeUtils.parseTimestamp
 
 import java.io.Serializable
@@ -41,9 +44,12 @@ class SpecializedAverageOpDesc extends AggregateOpDesc {
   @JsonProperty("groupByKeys")
   @JsonSchemaTitle("Group By Keys")
   @JsonPropertyDescription("group by columns")
+  @AutofillAttributeNameList
   var groupByKeys: List[String] = _
 
-  override def operatorExecutor: AggregateOpExecConfig[_] = {
+  override def operatorExecutor(
+      operatorSchemaInfo: OperatorSchemaInfo
+  ): AggregateOpExecConfig[_] = {
     aggFunction match {
       case AggregationFunction.AVERAGE => averageAgg()
       case AggregationFunction.COUNT   => countAgg()

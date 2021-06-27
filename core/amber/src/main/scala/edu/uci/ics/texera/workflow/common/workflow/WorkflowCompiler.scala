@@ -8,7 +8,7 @@ import edu.uci.ics.texera.workflow.common.{ConstraintViolation, WorkflowContext}
 import edu.uci.ics.texera.workflow.common.operators.OperatorDescriptor
 import edu.uci.ics.texera.workflow.common.operators.source.SourceOperatorDescriptor
 import edu.uci.ics.texera.workflow.common.tuple.Tuple
-import edu.uci.ics.texera.workflow.common.tuple.schema.Schema
+import edu.uci.ics.texera.workflow.common.tuple.schema.{Schema, OperatorSchemaInfo}
 import org.jgrapht.graph.{DefaultEdge, DirectedAcyclicGraph}
 
 import scala.collection.mutable
@@ -36,9 +36,15 @@ class WorkflowCompiler(val workflowInfo: WorkflowInfo, val context: WorkflowCont
       .filter(pair => pair._2.nonEmpty)
 
   def amberWorkflow: Workflow = {
+    val inputSchemaMap = propagateWorkflowSchema()
     val amberOperators: mutable.Map[OperatorIdentity, OpExecConfig] = mutable.Map()
     workflowInfo.operators.foreach(o => {
-      val amberOperator: OpExecConfig = o.operatorExecutor
+      val inputSchemas = inputSchemaMap(o).map(s => s.get).toArray
+      val outputSchema =
+        if (o.isInstanceOf[SourceOperatorDescriptor]) o.getOutputSchema(Array())
+        else o.getOutputSchema(inputSchemas)
+      val amberOperator: OpExecConfig =
+        o.operatorExecutor(OperatorSchemaInfo(inputSchemas, outputSchema))
       amberOperators.put(amberOperator.id, amberOperator)
     })
 
@@ -138,28 +144,28 @@ class WorkflowCompiler(val workflowInfo: WorkflowInfo, val context: WorkflowCont
         .withDefault(op => mutable.MutableList.fill(op.operatorInfo.inputPorts.size)(Option.empty))
 
     // propagate output schema following topological order
-    // TODO: introduce the concept of port in TexeraOperatorDescriptor and propagate schema according to port
     val topologicalOrderIterator = workflowDag.iterator()
     topologicalOrderIterator.forEachRemaining(op => {
       // infer output schema of this operator based on its input schema
       val outputSchema: Option[Schema] = {
-        if (op.isInstanceOf[SourceOperatorDescriptor]) {
-          // op is a source operator, ask for it output schema
-          Option.apply(op.getOutputSchema(Array()))
-        } else if (!inputSchemaMap.contains(op) || inputSchemaMap(op).exists(s => s.isEmpty)) {
-          // op does not have input, or any of the op's input's output schema is null
-          // then this op's output schema cannot be inferred as well
-          Option.empty
-        } else {
-          // op's input schema is complete, try to infer its output schema
-          // if inference failed, print an exception message, but still continue the process
-          try {
+        // call to "getOutputSchema" might cause exceptions, wrap in try/catch and return empty schema
+        try {
+          if (op.isInstanceOf[SourceOperatorDescriptor]) {
+            // op is a source operator, ask for it output schema
+            Option.apply(op.getOutputSchema(Array()))
+          } else if (!inputSchemaMap.contains(op) || inputSchemaMap(op).exists(s => s.isEmpty)) {
+            // op does not have input, or any of the op's input's output schema is null
+            // then this op's output schema cannot be inferred as well
+            Option.empty
+          } else {
+            // op's input schema is complete, try to infer its output schema
+            // if inference failed, print an exception message, but still continue the process
             Option.apply(op.getOutputSchema(inputSchemaMap(op).map(s => s.get).toArray))
-          } catch {
-            case e: Throwable =>
-              e.printStackTrace()
-              Option.empty
           }
+        } catch {
+          case e: Throwable =>
+            e.printStackTrace()
+            Option.empty
         }
       }
       // exception: if op is a source operator, use its output schema as input schema for autocomplete

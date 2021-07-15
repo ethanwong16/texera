@@ -64,7 +64,7 @@ public class ScatterplotOpDesc extends VisualizationOperator {
         if (!allowedAttributeTypesNumbersOnly.contains(yType)) {
             throw new IllegalArgumentException(yColumn + " is not a number \n");
         }
-        return new ScatterplotOpExecConfig(this.operatorIdentifier(), Constants.defaultNumWorkers());
+        return new ScatterplotOpExecConfig(this.operatorIdentifier(), this, operatorSchemaInfo);
     }
 
     @Override

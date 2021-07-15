@@ -9,7 +9,6 @@ import edu.uci.ics.texera.workflow.common.tuple.Tuple;
 import edu.uci.ics.texera.workflow.common.tuple.schema.Attribute;
 import edu.uci.ics.texera.workflow.common.tuple.schema.OperatorSchemaInfo;
 import edu.uci.ics.texera.workflow.common.tuple.schema.Schema;
-import org.apache.curator.shaded.com.google.common.collect.Iterators;
 import scala.Function1;
 import scala.Serializable;
 import scala.collection.Iterator;
@@ -84,7 +83,7 @@ public class ScatterplotOpExec implements OperatorExecutor {
         if (tuple.isLeft()) {
             return JavaConverters.asScalaIterator(processTuple(tuple.left().get()).iterator());
         } else { // input exhausted
-            return JavaConverters.asScalaIterator(Iterators.emptyIterator());
+            return JavaConverters.asScalaIterator(Collections.emptyIterator());
         }
     }
 }

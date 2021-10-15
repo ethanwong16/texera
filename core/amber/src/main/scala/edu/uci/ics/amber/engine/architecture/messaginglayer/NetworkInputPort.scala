@@ -1,24 +1,25 @@
 package edu.uci.ics.amber.engine.architecture.messaginglayer
 
 import akka.actor.ActorRef
+import com.typesafe.scalalogging.LazyLogging
 import edu.uci.ics.amber.engine.architecture.messaginglayer.NetworkCommunicationActor.NetworkAck
-import edu.uci.ics.amber.engine.common.WorkflowLogger
-import edu.uci.ics.amber.engine.common.virtualidentity.VirtualIdentity
+import edu.uci.ics.amber.engine.common.AmberLogging
+import edu.uci.ics.amber.engine.common.virtualidentity.ActorVirtualIdentity
 
 import scala.collection.mutable
 
 class NetworkInputPort[T](
-    val logger: WorkflowLogger,
-    val handler: (VirtualIdentity, T) => Unit
-) {
+    val actorId: ActorVirtualIdentity,
+    val handler: (ActorVirtualIdentity, T) => Unit
+) extends AmberLogging {
 
   private val idToOrderingEnforcers =
-    new mutable.AnyRefMap[VirtualIdentity, OrderingEnforcer[T]]()
+    new mutable.AnyRefMap[ActorVirtualIdentity, OrderingEnforcer[T]]()
 
   def handleMessage(
       sender: ActorRef,
       messageID: Long,
-      from: VirtualIdentity,
+      from: ActorVirtualIdentity,
       sequenceNumber: Long,
       payload: T
   ): Unit = {
@@ -34,7 +35,7 @@ class NetworkInputPort[T](
         iterable.foreach(v => handler.apply(from, v))
       case None =>
         // discard duplicate
-        logger.logInfo(s"receive duplicated: ${payload} from ${from}")
+        logger.info(s"receive duplicated: $payload from $from")
     }
   }
 

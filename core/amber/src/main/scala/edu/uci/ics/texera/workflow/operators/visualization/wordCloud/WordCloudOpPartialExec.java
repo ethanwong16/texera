@@ -7,7 +7,6 @@ import edu.uci.ics.texera.workflow.common.tuple.Tuple;
 import edu.uci.ics.texera.workflow.common.tuple.schema.Attribute;
 import edu.uci.ics.texera.workflow.common.tuple.schema.AttributeType;
 import edu.uci.ics.texera.workflow.common.tuple.schema.Schema;
-import org.apache.curator.shaded.com.google.common.collect.Iterators;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.en.EnglishAnalyzer;
@@ -18,6 +17,8 @@ import scala.util.Either;
 
 import java.io.StringReader;
 import java.util.*;
+
+import static edu.uci.ics.texera.workflow.operators.visualization.wordCloud.WordCloudOpDesc.partialAggregateSchema;
 
 
 /**
@@ -33,11 +34,6 @@ public class WordCloudOpPartialExec implements OperatorExecutor {
     // for incremental computation
     public static final int UPDATE_INTERVAL_MS = 500;
     private long lastUpdatedTime = 0;
-
-    private static final Schema resultSchema = Schema.newBuilder().add(
-            new Attribute("word", AttributeType.STRING),
-            new Attribute("size", AttributeType.INTEGER)
-    ).build();
 
     public WordCloudOpPartialExec(String textColumn) {
         this.textColumn = textColumn;
@@ -70,7 +66,7 @@ public class WordCloudOpPartialExec implements OperatorExecutor {
         List<Tuple> termFreqTuples = new ArrayList<>();
 
         for (Map.Entry<String, Integer> e : termFreqMap.entrySet()) {
-            termFreqTuples.add(Tuple.newBuilder().add(resultSchema, Arrays.asList(e.getKey(), e.getValue())).build());
+            termFreqTuples.add(Tuple.newBuilder(partialAggregateSchema).addSequentially(new Object[]{e.getKey(), e.getValue()}).build());
         }
         return termFreqTuples;
     }
@@ -93,13 +89,13 @@ public class WordCloudOpPartialExec implements OperatorExecutor {
     @Override
     public Iterator<Tuple> processTexeraTuple(Either<Tuple, InputExhausted> tuple, LinkIdentity input) {
         if (tuple.isLeft()) {
-            textList.add(tuple.left().get().getField(textColumn));
+            textList.add(tuple.left().get().getField(textColumn).toString());
             boolean condition = System.currentTimeMillis() - lastUpdatedTime > UPDATE_INTERVAL_MS;
             if (condition) {
                 lastUpdatedTime = System.currentTimeMillis();
                 return computeResultIteratorForOneBatch();
             } else {
-                return JavaConverters.asScalaIterator(Iterators.emptyIterator());
+                return JavaConverters.asScalaIterator(Collections.emptyIterator());
             }
         } else { // input exhausted
             lastUpdatedTime = System.currentTimeMillis();

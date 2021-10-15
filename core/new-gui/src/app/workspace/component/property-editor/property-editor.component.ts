@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { FormlyFieldConfig, FormlyFormOptions } from '@ngx-formly/core';
@@ -21,30 +22,35 @@ import { Preset, PresetService } from '../../service/preset/preset.service';
 import { isType, nonNull } from 'src/app/common/util/assert';
 import { takeUntil } from 'rxjs/operators';
 import { ReplaySubject } from 'rxjs';
+=======
+import { Component, OnInit } from "@angular/core";
+import { merge } from "rxjs";
+import { WorkflowActionService } from "../../service/workflow-graph/model/workflow-action.service";
+import { OperatorPropertyEditFrameComponent } from "./operator-property-edit-frame/operator-property-edit-frame.component";
+import { BreakpointPropertyEditFrameComponent } from "./breakpoint-property-edit-frame/breakpoint-property-edit-frame.component";
+import { DynamicComponentConfig } from "../../../common/type/dynamic-component-config";
+import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
+import {
+  DISPLAY_WORKFLOW_VERIONS_EVENT,
+  WorkflowVersionService,
+} from "../../../dashboard/service/workflow-version/workflow-version.service";
+import { VersionsListDisplayComponent } from "./versions-display/versions-display.component";
+
+export type PropertyEditFrameComponent =
+  | OperatorPropertyEditFrameComponent
+  | BreakpointPropertyEditFrameComponent
+  | VersionsListDisplayComponent;
+
+export type PropertyEditFrameConfig = DynamicComponentConfig<PropertyEditFrameComponent>;
+>>>>>>> 2ce08628a9c70a9b42b9055a593298352ff6912d
 
 /**
  * PropertyEditorComponent is the panel that allows user to edit operator properties.
+ * Depending on the highlighted operator or link, it displays OperatorPropertyEditFrameComponent
+ * or BreakpointPropertyEditFrameComponent accordingly
  *
- * Property Editor uses JSON Schema to automatically generate the form from the JSON Schema of an operator.
- * For example, the JSON Schema of Sentiment Analysis could be:
- *  'properties': {
- *    'attribute': { 'type': 'string' },
- *    'resultAttribute': { 'type': 'string' }
- *  }
- * The automatically generated form will show two input boxes, one titled 'attribute' and one titled 'resultAttribute'.
- * More examples of the operator JSON schema can be found in `mock-operator-metadata.data.ts`
- * More about JSON Schema: Understanding JSON Schema - https://spacetelescope.github.io/understanding-json-schema/
- *
- * OperatorMetadataService will fetch metadata about the operators, which includes the JSON Schema, from the backend.
- *
- * We use library `@ngx-formly` to generate form from json schema
- * https://github.com/ngx-formly/ngx-formly
- *
- * For more details of comparing different libraries, and the problems of the current library,
- *  see `json-schema-library.md`
- *
- * @author Zuozhi Wang
  */
+<<<<<<< HEAD
 
 /**
  * optional arguments for setFormlyFormBinding. 
@@ -54,11 +60,15 @@ type FormContext = {
   type: 'operator' | 'breakpoint',
   operator?: OperatorPredicate
 };
+=======
+@UntilDestroy()
+>>>>>>> 2ce08628a9c70a9b42b9055a593298352ff6912d
 @Component({
-  selector: 'texera-property-editor',
-  templateUrl: './property-editor.component.html',
-  styleUrls: ['./property-editor.component.scss']
+  selector: "texera-property-editor",
+  templateUrl: "./property-editor.component.html",
+  styleUrls: ["./property-editor.component.scss"],
 })
+<<<<<<< HEAD
 export class PropertyEditorComponent implements OnDestroy {
 
   // debounce time for form input in milliseconds
@@ -114,10 +124,14 @@ export class PropertyEditorComponent implements OnDestroy {
   private ajv = new Ajv({useDefaults: true});
   // used to tear down subscriptions that takeUntil(teardownObservable)
   private teardownObservable: ReplaySubject<boolean> = new ReplaySubject(1);
+=======
+export class PropertyEditorComponent implements OnInit {
+  frameComponentConfig?: PropertyEditFrameConfig;
+>>>>>>> 2ce08628a9c70a9b42b9055a593298352ff6912d
 
   constructor(
-    public formlyJsonschema: FormlyJsonschema,
     public workflowActionService: WorkflowActionService,
+<<<<<<< HEAD
     public autocompleteService: DynamicSchemaService,
     public executeWorkflowService: ExecuteWorkflowService,
     private schemaPropagationService: SchemaPropagationService,
@@ -183,16 +197,23 @@ export class PropertyEditorComponent implements OnDestroy {
     }
     this.resetPropertyEditor();
   }
+=======
+    public workflowVersionService: WorkflowVersionService
+  ) {}
+>>>>>>> 2ce08628a9c70a9b42b9055a593298352ff6912d
 
-  public allowChangeOperatorLogic() {
-    this.setInteractivity(true);
+  ngOnInit(): void {
+    this.registerHighlightEventsHandler();
   }
 
-  public confirmChangeOperatorLogic() {
-    this.setInteractivity(false);
-    if (this.currentOperatorID) {
-      this.executeWorkflowService.changeOperatorLogic(this.currentOperatorID);
+  switchFrameComponent(targetConfig?: PropertyEditFrameConfig) {
+    if (
+      this.frameComponentConfig?.component === targetConfig?.component &&
+      this.frameComponentConfig?.componentInputs === targetConfig?.componentInputs
+    ) {
+      return;
     }
+<<<<<<< HEAD
   }
 
   public setInteractivity(interactive: boolean) {
@@ -511,6 +532,10 @@ export class PropertyEditorComponent implements OnDestroy {
         this.workflowActionService.setOperatorProperty(this.currentOperatorID, cloneDeep(formData));
       }
     });
+=======
+
+    this.frameComponentConfig = targetConfig;
+>>>>>>> 2ce08628a9c70a9b42b9055a593298352ff6912d
   }
 
   private handleApplyPreset(): void {
@@ -531,13 +556,14 @@ export class PropertyEditorComponent implements OnDestroy {
    * Displays the form of the link breakpoint if only one link is highlighted;
    * hides the form if no operator/link is highlighted or multiple operators and/or groups and/or links are highlighted.
    */
-  private handleHighlightEvents() {
-    Observable.merge(
+  registerHighlightEventsHandler() {
+    merge(
       this.workflowActionService.getJointGraphWrapper().getJointOperatorHighlightStream(),
       this.workflowActionService.getJointGraphWrapper().getJointOperatorUnhighlightStream(),
       this.workflowActionService.getJointGraphWrapper().getJointGroupHighlightStream(),
       this.workflowActionService.getJointGraphWrapper().getJointGroupUnhighlightStream(),
       this.workflowActionService.getJointGraphWrapper().getLinkHighlightStream(),
+<<<<<<< HEAD
       this.workflowActionService.getJointGraphWrapper().getLinkUnhighlightStream()
     ).subscribe(async () => {
       const highlightedOperators = this.workflowActionService.getJointGraphWrapper().getCurrentHighlightedOperatorIDs();
@@ -672,4 +698,38 @@ export class PropertyEditorComponent implements OnDestroy {
       this.operatorMetadataService.getOperatorSchema(operatorType).jsonSchema,
       this.formData);
   }
+=======
+      this.workflowActionService.getJointGraphWrapper().getLinkUnhighlightStream(),
+      this.workflowVersionService.workflowVersionsDisplayObservable()
+    )
+      .pipe(untilDestroyed(this))
+      .subscribe(event => {
+        const isDisplayWorkflowVersions = event.length === 1 && event[0] === DISPLAY_WORKFLOW_VERIONS_EVENT;
+
+        const highlightedOperators = this.workflowActionService
+          .getJointGraphWrapper()
+          .getCurrentHighlightedOperatorIDs();
+        const highlightedGroups = this.workflowActionService.getJointGraphWrapper().getCurrentHighlightedGroupIDs();
+        const highlightLinks = this.workflowActionService.getJointGraphWrapper().getCurrentHighlightedLinkIDs();
+
+        if (isDisplayWorkflowVersions) {
+          this.switchFrameComponent({
+            component: VersionsListDisplayComponent,
+          });
+        } else if (highlightedOperators.length === 1 && highlightedGroups.length === 0 && highlightLinks.length === 0) {
+          this.switchFrameComponent({
+            component: OperatorPropertyEditFrameComponent,
+            componentInputs: { currentOperatorId: highlightedOperators[0] },
+          });
+        } else if (highlightLinks.length === 1 && highlightedGroups.length === 0 && highlightedOperators.length === 0) {
+          this.switchFrameComponent({
+            component: BreakpointPropertyEditFrameComponent,
+            componentInputs: { currentLinkId: highlightLinks[0] },
+          });
+        } else {
+          this.switchFrameComponent(undefined);
+        }
+      });
+  }
+>>>>>>> 2ce08628a9c70a9b42b9055a593298352ff6912d
 }

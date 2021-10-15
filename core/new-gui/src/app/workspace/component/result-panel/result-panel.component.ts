@@ -1,558 +1,193 @@
-import { Component, Input } from '@angular/core';
-import deepMap from 'deep-map';
-import { isEqual } from 'lodash';
-import { NzModalRef, NzModalService } from 'ng-zorro-antd/modal';
-import { NzTableQueryParams } from 'ng-zorro-antd/table';
-import { Observable } from 'rxjs/Observable';
-import { asType } from 'src/app/common/util/assert';
-import { sessionGetObject, sessionRemoveObject, sessionSetObject } from 'src/app/common/util/storage';
-import { ExecuteWorkflowService } from '../../service/execute-workflow/execute-workflow.service';
-import { ResultPanelToggleService } from '../../service/result-panel-toggle/result-panel-toggle.service';
-import { WorkflowActionService } from '../../service/workflow-graph/model/workflow-action.service';
-import { WorkflowWebsocketService } from '../../service/workflow-websocket/workflow-websocket.service';
-import { ExecutionState } from '../../types/execute-workflow.interface';
-import { IndexableObject, PAGINATION_INFO_STORAGE_KEY, ResultPaginationInfo, TableColumn } from '../../types/result-table.interface';
-import { BreakpointTriggerInfo } from '../../types/workflow-common.interface';
-import { WorkflowStatusService } from '../../service/workflow-status/workflow-status.service';
+import { Component, OnInit } from "@angular/core";
+import { merge } from "rxjs";
+import { ExecuteWorkflowService } from "../../service/execute-workflow/execute-workflow.service";
+import { ResultPanelToggleService } from "../../service/result-panel-toggle/result-panel-toggle.service";
+import { WorkflowActionService } from "../../service/workflow-graph/model/workflow-action.service";
+import { ExecutionState, ExecutionStateInfo } from "../../types/execute-workflow.interface";
+import { ResultTableFrameComponent } from "./result-table-frame/result-table-frame.component";
+import { ConsoleFrameComponent } from "./console-frame/console-frame.component";
+import { WorkflowResultService } from "../../service/workflow-result/workflow-result.service";
+import { VisualizationFrameComponent } from "./visualization-frame/visualization-frame.component";
+import { filter } from "rxjs/operators";
+import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
+import { DynamicComponentConfig } from "../../../common/type/dynamic-component-config";
+import { DebuggerFrameComponent } from "./debugger-frame/debugger-frame.component";
+import { PYTHON_UDF_V2_OP_TYPE } from "../../service/workflow-graph/model/workflow-graph";
+import { environment } from "../../../../environments/environment";
+
+export type ResultFrameComponent =
+  | ResultTableFrameComponent
+  | VisualizationFrameComponent
+  | ConsoleFrameComponent
+  | DebuggerFrameComponent;
+
+export type ResultFrameComponentConfig = DynamicComponentConfig<ResultFrameComponent>;
 
 /**
  * ResultPanelComponent is the bottom level area that displays the
  *  execution result of a workflow after the execution finishes.
- *
- * The Component will display the result in an excel table format,
- *  where each row represents a result from the workflow,
- *  and each column represents the type of result the workflow returns.
- *
- * Clicking each row of the result table will create an pop-up window
- *  and display the detail of that row in a pretty json format.
- *
- * @author Henry Chen
- * @author Zuozhi Wang
  */
+@UntilDestroy()
 @Component({
-  selector: 'texera-result-panel',
-  templateUrl: './result-panel.component.html',
-  styleUrls: ['./result-panel.component.scss']
+  selector: "texera-result-panel",
+  templateUrl: "./result-panel.component.html",
+  styleUrls: ["./result-panel.component.scss"],
 })
-export class ResultPanelComponent {
-  public static readonly DEFAULT_PAGE_SIZE: number = 10;
-
-  private static readonly PRETTY_JSON_TEXT_LIMIT: number = 50000;
-  private static readonly TABLE_COLUMN_TEXT_LIMIT: number = 1000;
-
-  public showResultPanel: boolean = false;
-
-  // display error message:
-  public errorMessages: Readonly<Record<string, string>> | undefined;
-
-  // display result table
-  public currentColumns: TableColumn[] | undefined;
-  public currentDisplayColumns: string[] | undefined;
-  public currentResult: object[] = [];
-
-  // display visualization
-  public chartType: string | undefined;
-
-  // display breakpoint
-  public breakpointTriggerInfo: BreakpointTriggerInfo | undefined;
-  public breakpointAction: boolean = false;
+export class ResultPanelComponent implements OnInit {
+  frameComponentConfigs: Map<string, ResultFrameComponentConfig> = new Map();
 
   // the highlighted operator ID for display result table / visualization / breakpoint
-  public resultPanelOperatorID: string | undefined;
+  currentOperatorId?: string;
 
-  // paginator section, used when displaying rows
-
-  // this attribute stores whether front-end should handle pagination
-  //   if false, it means the pagination is managed by the server
-  //   see https://ng.ant.design/components/table/en#components-table-demo-ajax
-  //   for more details
-  public isFrontPagination: boolean = true;
-  public isLoadingResult: boolean = false;
-  // this starts from **ONE**, not zero
-  public currentPageIndex: number = 1;
-  public total: number = 0;
+  showResultPanel: boolean = false;
 
   constructor(
     private executeWorkflowService: ExecuteWorkflowService,
-    private modalService: NzModalService,
     private resultPanelToggleService: ResultPanelToggleService,
     private workflowActionService: WorkflowActionService,
-    private workflowWebsocketService: WorkflowWebsocketService,
-    private workflowStatusService: WorkflowStatusService
-  ) {
-    const activeStates: ExecutionState[] = [ExecutionState.Completed, ExecutionState.Failed, ExecutionState.BreakpointTriggered];
-    Observable.merge(
-      this.executeWorkflowService.getExecutionStateStream(),
+    private workflowResultService: WorkflowResultService
+  ) {}
+
+  ngOnInit(): void {
+    this.registerAutoRerenderResultPanel();
+    this.registerAutoOpenResultPanel();
+  }
+
+  registerAutoOpenResultPanel() {
+    this.executeWorkflowService
+      .getExecutionStateStream()
+      .pipe(untilDestroyed(this))
+      .subscribe(event => {
+        const currentlyHighlighted = this.workflowActionService
+          .getJointGraphWrapper()
+          .getCurrentHighlightedOperatorIDs();
+        if (event.current.state === ExecutionState.BreakpointTriggered) {
+          const breakpointOperator = this.executeWorkflowService.getBreakpointTriggerInfo()?.operatorID;
+          if (breakpointOperator) {
+            this.workflowActionService.getJointGraphWrapper().unhighlightOperators(...currentlyHighlighted);
+            this.workflowActionService.getJointGraphWrapper().highlightOperators(breakpointOperator);
+          }
+          this.resultPanelToggleService.openResultPanel();
+        }
+        if (event.current.state === ExecutionState.Failed) {
+          this.resultPanelToggleService.openResultPanel();
+        }
+        if (event.current.state === ExecutionState.Completed || event.current.state === ExecutionState.Running) {
+          const sinkOperators = this.workflowActionService
+            .getTexeraGraph()
+            .getAllOperators()
+            .filter(op => op.operatorType.toLowerCase().includes("sink"));
+          if (sinkOperators.length > 0 && !this.currentOperatorId) {
+            this.workflowActionService.getJointGraphWrapper().unhighlightOperators(...currentlyHighlighted);
+            this.workflowActionService.getJointGraphWrapper().highlightOperators(sinkOperators[0].operatorID);
+          }
+          this.resultPanelToggleService.openResultPanel();
+        }
+      });
+  }
+
+  registerAutoRerenderResultPanel() {
+    merge(
+      this.executeWorkflowService
+        .getExecutionStateStream()
+        .pipe(filter(event => ResultPanelComponent.needRerenderOnStateChange(event))),
       this.workflowActionService.getJointGraphWrapper().getJointOperatorHighlightStream(),
       this.workflowActionService.getJointGraphWrapper().getJointOperatorUnhighlightStream(),
-      this.resultPanelToggleService.getToggleChangeStream()
-    ).subscribe(trigger => this.displayResultPanel());
-
-    this.executeWorkflowService.getExecutionStateStream().subscribe(event => {
-      if (event.current.state === ExecutionState.BreakpointTriggered) {
-        const breakpointOperator = this.executeWorkflowService.getBreakpointTriggerInfo()?.operatorID;
-        if (breakpointOperator) {
-          this.workflowActionService.getJointGraphWrapper().highlightOperators(breakpointOperator);
-        }
-        this.resultPanelToggleService.openResultPanel();
-      }
-      if (event.current.state === ExecutionState.Failed) {
-        this.resultPanelToggleService.openResultPanel();
-      }
-      if (event.current.state === ExecutionState.Completed || event.current.state === ExecutionState.Running) {
-        const sinkOperators = this.workflowActionService.getTexeraGraph().getAllOperators()
-          .filter(op => op.operatorType.toLowerCase().includes('sink'));
-        if (sinkOperators.length > 0) {
-          this.workflowActionService.getJointGraphWrapper().highlightOperators(sinkOperators[0].operatorID);
-        }
-        this.resultPanelToggleService.openResultPanel();
-      }
-    });
-
-    this.executeWorkflowService.getExecutionStateStream().subscribe(event => {
-      if (event.current.state === ExecutionState.Completed) {
-        // remove previously stored partial result
-        sessionRemoveObject(PAGINATION_INFO_STORAGE_KEY);
-      }
-    });
-
-    this.workflowWebsocketService.websocketEvent().subscribe(websocketEvent => {
-      if (websocketEvent.type !== 'PaginatedResultEvent') {
-        return;
-      }
-
-      const paginatedResults = websocketEvent.paginatedResults.filter(r => r.operatorID === this.resultPanelOperatorID);
-      if (paginatedResults.length === 0) {
-        return;
-      }
-      const result = paginatedResults[0];
-
-      this.total = result.totalRowCount;
-      this.currentResult = result.table.slice();
-
-      // When there is a result data from the backend,
-      //  1. Get all the column names except '_id', using the first instance of
-      //      result data.
-      //  2. Use those names to generate a list of display columns, which would
-      //      be used for displaying on angular mateiral table.
-      //  3. Pass the result data as array to generate a new angular material
-      //      data table.
-      //  4. Set the newly created data table to our own paginator.
-
-      let columns: {columnKey: any, columnText: string}[];
-
-      const columnKeys = Object.keys(this.currentResult[0]).filter(x => x !== '_id');
-      this.currentDisplayColumns = columnKeys;
-      columns = columnKeys.map(v => ({columnKey: v, columnText: v}));
-
-      // generate columnDef from first row, column definition is in order
-      this.currentColumns = ResultPanelComponent.generateColumns(columns);
-
-      // save result
-      const resultPaginationInfo = {
-        newWorkflowExecuted: false,
-        currentResult: this.currentResult,
-        currentPageIndex: this.currentPageIndex,
-        total: this.total,
-        columnKeys: columnKeys,
-        operatorID: this.resultPanelOperatorID
-      };
-      sessionSetObject(PAGINATION_INFO_STORAGE_KEY, resultPaginationInfo);
-      return;
-    });
-
-    this.workflowStatusService.getResultUpdateStream().subscribe(_ => {
-      if (!this.resultPanelOperatorID) {
-        return;
-      }
-
-      const result = this.workflowStatusService.getCurrentResult()[this.resultPanelOperatorID];
-      const currentSinkStats = this.workflowStatusService.getCurrentStatus()[this.resultPanelOperatorID];
-
-      // Don't update if the state is already in Completed
-      //  because our result may conflict with the more recent result from WorkflowCompletedEvent
-      if (! result || this.executeWorkflowService.getExecutionState().state === ExecutionState.Completed) {
-        return;
-      }
-
-      this.chartType = result.chartType;
-      this.isFrontPagination = false;
-
-      const previousTotal = this.total;
-      this.total = result.totalRowCount;
-
-      // if there are new results and we need them
-      if (
-        (currentSinkStats.aggregatedOutputResultDirtyPageIndices ?? []).includes(this.currentPageIndex) ||
-        (previousTotal !== this.total && this.currentResult.length < ResultPanelComponent.DEFAULT_PAGE_SIZE)
-      ) {
-
-        if (this.total < previousTotal &&  // less row count
-          this.currentPageIndex === Math.ceil(previousTotal / ResultPanelComponent.DEFAULT_PAGE_SIZE) && // on the last page
-          Math.ceil(this.total / ResultPanelComponent.DEFAULT_PAGE_SIZE) < this.currentPageIndex         // less page
-        ) {
-            this.currentPageIndex = Math.ceil(this.total / ResultPanelComponent.DEFAULT_PAGE_SIZE);  // decrease page index
-        }
-
-        console.log('sending result pagination request');
-        this.workflowWebsocketService.send('ResultPaginationRequest',
-          { pageSize: ResultPanelComponent.DEFAULT_PAGE_SIZE, pageIndex: this.currentPageIndex });
-      } else {
-        const resultPaginationInfo = {
-          newWorkflowExecuted: false,
-          currentResult: this.currentResult,
-          currentPageIndex: this.currentPageIndex,
-          total: this.total,
-          columnKeys: this.currentColumns,
-          operatorID: this.resultPanelOperatorID
-        };
-        sessionSetObject(PAGINATION_INFO_STORAGE_KEY, resultPaginationInfo);
-      }
-    });
-
-    // clear session storage for refresh
-    sessionRemoveObject(PAGINATION_INFO_STORAGE_KEY);
+      this.resultPanelToggleService.getToggleChangeStream(),
+      this.workflowResultService.getResultInitiateStream()
+    )
+      .pipe(untilDestroyed(this))
+      .subscribe(_ => {
+        this.rerenderResultPanel();
+      });
   }
 
-  public displayResultPanel(): void {
-    // current result panel is closed, do nothing
-    this.showResultPanel = this.resultPanelToggleService.isResultPanelOpen();
-    if (!this.showResultPanel) {
-      return;
-    }
-
-    // clear everything, prepare for state change
-    this.clearResultPanel();
-
-    const executionState = this.executeWorkflowService.getExecutionState();
+  rerenderResultPanel(): void {
+    // update highlighted operator
     const highlightedOperators = this.workflowActionService.getJointGraphWrapper().getCurrentHighlightedOperatorIDs();
-    this.resultPanelOperatorID = highlightedOperators.length === 1 ? highlightedOperators[0] : undefined;
+    const currentHighlightedOperator = highlightedOperators.length === 1 ? highlightedOperators[0] : undefined;
+    if (this.currentOperatorId !== currentHighlightedOperator) {
+      // clear everything, prepare for state change
+      this.clearResultPanel();
+      this.currentOperatorId = currentHighlightedOperator;
+    }
+    // current result panel is closed or there is no operator highlighted, do nothing
+    this.showResultPanel = this.resultPanelToggleService.isResultPanelOpen();
+    if (!this.showResultPanel || !this.currentOperatorId) {
+      return;
+    }
 
-    if (executionState.state === ExecutionState.Failed) {
-      this.errorMessages = this.executeWorkflowService.getErrorMessages();
-    } else if (executionState.state === ExecutionState.BreakpointTriggered) {
-      const breakpointTriggerInfo = this.executeWorkflowService.getBreakpointTriggerInfo();
-      if (this.resultPanelOperatorID && this.resultPanelOperatorID === breakpointTriggerInfo?.operatorID) {
-        this.breakpointTriggerInfo = breakpointTriggerInfo;
-        this.breakpointAction = true;
-        const result = breakpointTriggerInfo.report.map(r => r.faultedTuple.tuple).filter(t => t !== undefined);
-        this.setupResultTable(result, result.length, highlightedOperators[0]);
-        const errorsMessages: Record<string, string> = {};
-        breakpointTriggerInfo.report.forEach(r => {
-          const pathsplitted = r.actorPath.split('/');
-          const workerName = pathsplitted[pathsplitted.length - 1];
-          const workerText = 'Worker ' + workerName + ':                ';
-          if (r.messages.toString().toLowerCase().includes('exception')) {
-            errorsMessages[workerText] = r.messages.toString();
-          }
-        });
-        this.errorMessages = errorsMessages;
-      }
-    } else if (executionState.state === ExecutionState.Completed) {
-      if (this.resultPanelOperatorID) {
-        const result = executionState.resultMap.get(this.resultPanelOperatorID);
-        if (result) {
-          this.chartType = result.chartType;
-          this.isFrontPagination = false;
-          this.setupResultTable(result.table, result.totalRowCount, highlightedOperators[0]);
-        }
-      }
-    } else if (executionState.state === ExecutionState.Paused) {
-      if (this.resultPanelOperatorID) {
-        const result = executionState.currentTuples[this.resultPanelOperatorID]?.tuples;
-        if (result) {
-          const resultTable: string[][] = [];
-          result.forEach(workerTuple => {
-            const updatedTuple: string[] = [];
-            updatedTuple.push(workerTuple.workerID);
-            updatedTuple.push(...workerTuple.tuple);
-            resultTable.push(updatedTuple);
-          });
-          this.setupResultTable(resultTable, resultTable.length, highlightedOperators[0]);
+    if (this.currentOperatorId) {
+      this.displayResult(this.currentOperatorId);
+      const operator = this.workflowActionService.getTexeraGraph().getOperator(this.currentOperatorId);
+      if (operator.operatorType === PYTHON_UDF_V2_OP_TYPE) {
+        this.displayConsole(this.currentOperatorId);
+
+        if (environment.debuggerEnabled && this.hasErrorOrBreakpoint()) {
+          this.displayDebugger(this.currentOperatorId);
         }
       }
     }
   }
 
-  public clearResultPanel(): void {
-    // store result into session storage so that they could be restored
-    //   when user click the "view result" operator again
-    const resultPaginationInfo = sessionGetObject<ResultPaginationInfo>(PAGINATION_INFO_STORAGE_KEY);
-    if (resultPaginationInfo && !resultPaginationInfo.newWorkflowExecuted && this.currentResult.length > 0 && this.resultPanelOperatorID) {
-      sessionSetObject(PAGINATION_INFO_STORAGE_KEY, {
-        ...resultPaginationInfo,
-        // We have to turn it into array first because JSON.stringfy(someMap) will produce an empty object
-        viewResultOperatorInfoMap: Array.from((new Map(resultPaginationInfo.viewResultOperatorInfoMap).set(this.resultPanelOperatorID, {
-          currentResult: this.currentResult,
-          currentPageIndex: this.currentPageIndex,
-          total: this.total,
-          columnKeys: this.currentDisplayColumns ?? [],
-          operatorID: this.resultPanelOperatorID
-        })).entries())
+  hasErrorOrBreakpoint(): boolean {
+    const executionState = this.executeWorkflowService.getExecutionState();
+    return [ExecutionState.Failed, ExecutionState.BreakpointTriggered].includes(executionState.state);
+  }
+
+  clearResultPanel(): void {
+    this.frameComponentConfigs.clear();
+  }
+
+  displayConsole(operatorId: string) {
+    this.frameComponentConfigs.set("Console", {
+      component: ConsoleFrameComponent,
+      componentInputs: { operatorId },
+    });
+  }
+
+  displayDebugger(operatorId: string) {
+    this.frameComponentConfigs.set("Debugger", {
+      component: DebuggerFrameComponent,
+      componentInputs: { operatorId },
+    });
+  }
+
+  displayResult(operatorId: string) {
+    const resultService = this.workflowResultService.getResultService(operatorId);
+    const paginatedResultService = this.workflowResultService.getPaginatedResultService(operatorId);
+    if (paginatedResultService) {
+      // display table result if has paginated results
+      this.frameComponentConfigs.set("Result", {
+        component: ResultTableFrameComponent,
+        componentInputs: { operatorId },
+      });
+    } else if (resultService && resultService.getChartType()) {
+      // display visualization result
+      this.frameComponentConfigs.set("Result", {
+        component: VisualizationFrameComponent,
+        componentInputs: { operatorId },
       });
     }
+  }
 
-    this.errorMessages = undefined;
-
-    this.currentColumns = undefined;
-    this.currentDisplayColumns = undefined;
-    this.currentResult = [];
-
-    this.resultPanelOperatorID = undefined;
-    this.chartType = undefined;
-    this.breakpointTriggerInfo = undefined;
-    this.breakpointAction = false;
-
-    this.isFrontPagination = true;
-
-    if (sessionGetObject<ResultPaginationInfo>(PAGINATION_INFO_STORAGE_KEY) !== null) {
-      this.currentPageIndex = 1;
+  private static needRerenderOnStateChange(event: {
+    previous: ExecutionStateInfo;
+    current: ExecutionStateInfo;
+  }): boolean {
+    // transitioning from any state to failed state
+    if (event.current.state === ExecutionState.Failed) {
+      return true;
+    }
+    // transitioning from any state to breakpoint triggered state
+    if (event.current.state === ExecutionState.BreakpointTriggered) {
+      return true;
     }
 
-    this.total = 0;
-    this.isLoadingResult = false;
-  }
-
-  /**
-   * Opens the ng-bootstrap model to display the row details in
-   *  pretty json format when clicked. User can view the details
-   *  in a larger, expanded format.
-   *
-   * @param rowData the object containing the data of the current row in columnDef and cellData pairs
-   */
-  public open(rowData: object): void {
-
-    let selectedRowIndex = this.currentResult.findIndex(eachRow => isEqual(eachRow, rowData));
-
-    // generate a new row data that shortens the column text to limit rendering time for pretty json
-    const rowDataCopy = ResultPanelComponent.trimDisplayJsonData(rowData as IndexableObject);
-
-    // open the modal component
-    const modalRef: NzModalRef = this.modalService.create({
-      // modal title
-      nzTitle: 'Row Details',
-      nzContent: RowModalComponent,
-      // set component @Input attributes
-      nzComponentParams: {
-        // set the currentDisplayRowData of the modal to be the data of clicked row
-        currentDisplayRowData: rowDataCopy,
-        // set the index value and page size to the modal for navigation
-        currentDisplayRowIndex: selectedRowIndex
-      },
-      // prevent browser focusing close button (ugly square highlight)
-      nzAutofocus: null,
-      // modal footer buttons
-      nzFooter: [
-        {
-          label: '<',
-          onClick: () => {
-            selectedRowIndex -= 1;
-            asType(modalRef.componentInstance, RowModalComponent).currentDisplayRowData = this.currentResult[selectedRowIndex];
-          },
-          disabled: () => selectedRowIndex === 0
-        },
-        {
-          label: '>',
-          onClick: () => {
-            selectedRowIndex += 1;
-            asType(modalRef.componentInstance, RowModalComponent).currentDisplayRowData = this.currentResult[selectedRowIndex];
-          },
-          disabled: () => selectedRowIndex === this.currentResult.length - 1
-        },
-        {label: 'OK', onClick: () => {modalRef.destroy(); }, type: 'primary'}
-      ]
-    });
-  }
-
-  public onClickSkipTuples(): void {
-    this.executeWorkflowService.skipTuples();
-    this.breakpointAction = false;
-  }
-
-  /**
-   * Callback function for table query params changed event
-   *   params containing new page index, new page size, and more
-   *   (this function will be called when user switch page)
-   *
-   * @param params new parameters
-   */
-  public onTableQueryParamsChange(params: NzTableQueryParams) {
-    const { pageSize: newPageSize, pageIndex: newPageIndex } = params;
-
-    if (this.isFrontPagination) {
-      return;
+    // transition from uninitialized / completed to anything else indicates a new execution of the workflow
+    if (event.previous.state === ExecutionState.Uninitialized || event.previous.state === ExecutionState.Completed) {
+      return true;
     }
-
-    this.currentPageIndex = newPageIndex;
-
-    this.workflowWebsocketService.send('ResultPaginationRequest', { pageSize: newPageSize, pageIndex: newPageIndex });
+    return false;
   }
-
-  /**
-   * Updates all the result table properties based on the execution result,
-   *  displays a new data table with a new paginator on the result panel.
-   *
-   * @param resultData rows of the result (may not be all rows if displaying result for workflow completed event)
-   * @param totalRowCount the total number of rows for the result
-   * @param operatorID id of the operator providing data
-   */
-  private setupResultTable(resultData: ReadonlyArray<object>, totalRowCount: number, operatorID: string) {
-    this.resultPanelOperatorID = operatorID;
-
-    if (resultData.length < 1) {
-      return;
-    }
-
-    // if there is no new result
-    //   then restore the previous paginated result data from session storage
-    let resultPaginationInfo = sessionGetObject<ResultPaginationInfo>(PAGINATION_INFO_STORAGE_KEY);
-
-    if (resultPaginationInfo && !resultPaginationInfo.newWorkflowExecuted) {
-      const viewResultOperatorInfoMap = new Map(resultPaginationInfo.viewResultOperatorInfoMap);
-      const viewResultOperatorInfo = viewResultOperatorInfoMap.get(this.resultPanelOperatorID);
-      if (viewResultOperatorInfo) {
-        this.isFrontPagination = false;
-        this.currentResult = viewResultOperatorInfo.currentResult;
-        this.currentPageIndex = viewResultOperatorInfo.currentPageIndex;
-        this.total = viewResultOperatorInfo.total;
-        this.currentDisplayColumns = viewResultOperatorInfo.columnKeys;
-
-        this.currentColumns = ResultPanelComponent.generateColumns(
-          this.currentDisplayColumns.map(v => ({columnKey: v, columnText: v}))
-        );
-        return;
-      }
-    }
-
-    // creates a shallow copy of the readonly response.result,
-    //  this copy will be has type object[] because MatTableDataSource's input needs to be object[]
-    this.currentResult = resultData.slice();
-
-    // When there is a result data from the backend,
-    //  1. Get all the column names except '_id', using the first instance of
-    //      result data.
-    //  2. Use those names to generate a list of display columns, which would
-    //      be used for displaying on angular material table.
-    //  3. Pass the result data as array to generate a new angular material
-    //      data table.
-    //  4. Set the newly created data table to our own paginator.
-
-    let columns: { columnKey: any, columnText: string }[];
-
-    const columnKeys = Object.keys(resultData[0]).filter(x => x !== '_id');
-    this.currentDisplayColumns = columnKeys;
-    columns = columnKeys.map(v => ({columnKey: v, columnText: v}));
-
-    // generate columnDef from first row, column definition is in order
-    this.currentColumns = ResultPanelComponent.generateColumns(columns);
-    this.total = totalRowCount;
-
-    this.workflowWebsocketService.send('ResultPaginationRequest',
-    { pageSize: ResultPanelComponent.DEFAULT_PAGE_SIZE, pageIndex: this.currentPageIndex });
-
-    // save paginated result into session storage
-    resultPaginationInfo = {
-      newWorkflowExecuted: false,
-
-      // just update the map if there's one; otherwise create a map with current view result operator as an entry
-      viewResultOperatorInfoMap: resultPaginationInfo ? (new Map(resultPaginationInfo.viewResultOperatorInfoMap)).set(operatorID, {
-        currentResult: this.currentResult,
-        currentPageIndex: this.currentPageIndex,
-        total: this.total,
-        columnKeys: columnKeys,
-        operatorID: this.resultPanelOperatorID
-      }) : new Map([[operatorID, {
-        currentResult: this.currentResult,
-        currentPageIndex: this.currentPageIndex,
-        total: this.total,
-        columnKeys: columnKeys,
-        operatorID: this.resultPanelOperatorID
-      }]])
-    };
-    sessionSetObject(PAGINATION_INFO_STORAGE_KEY, {
-      newWorkflowExecuted: resultPaginationInfo.newWorkflowExecuted,
-      // We have to turn it into array first because JSON.stringfy(someMap) will produce an empty object
-      viewResultOperatorInfoMap: Array.from(resultPaginationInfo.viewResultOperatorInfoMap.entries())
-    });
-  }
-
-  /**
-   * Generates all the column information for the result data table
-   *
-   * @param columns
-   */
-  private static generateColumns(columns: { columnKey: any, columnText: string }[]): TableColumn[] {
-    return columns.map(col => ({
-      columnDef: col.columnKey,
-      header: col.columnText,
-      getCell: (row: IndexableObject) => {
-        if (row[col.columnKey] !== null && row[col.columnKey] !== undefined) {
-          return this.trimTableCell(row[col.columnKey].toString());
-        } else {
-          // allowing null value from backend
-          return '';
-        }
-      }
-    }));
-  }
-
-  private static trimTableCell(cellContent: string): string {
-    if (cellContent.length > this.TABLE_COLUMN_TEXT_LIMIT) {
-      return cellContent.substring(0, this.TABLE_COLUMN_TEXT_LIMIT);
-    }
-    return cellContent;
-  }
-
-  /**
-   * This method will recursively iterate through the content of the row data and shorten
-   *  the column string if it exceeds a limit that will excessively slow down the rendering time
-   *  of the UI.
-   *
-   * This method will return a new copy of the row data that will be displayed on the UI.
-   *
-   * @param rowData original row data returns from execution
-   */
-  private static trimDisplayJsonData(rowData: IndexableObject): object {
-    const rowDataTrimmed = deepMap<object>(rowData, value => {
-      if (typeof value === 'string' && value.length > this.PRETTY_JSON_TEXT_LIMIT) {
-        return value.substring(0, this.PRETTY_JSON_TEXT_LIMIT) + '...';
-      } else {
-        return value;
-      }
-    });
-    return rowDataTrimmed;
-  }
-
 }
-
-/**
- *
- * NgbModalComponent is the pop-up window that will be
- *  displayed when the user clicks on a specific row
- *  to show the displays of that row.
- *
- * User can exit the pop-up window by
- *  1. Clicking the dismiss button on the top-right hand corner
- *      of the Modal
- *  2. Clicking the `Close` button at the bottom-right
- *  3. Clicking any shaded area that is not the pop-up window
- *  4. Pressing `Esc` button on the keyboard
- */
-@Component({
-  selector: 'texera-row-modal-content',
-  templateUrl: './result-panel-modal.component.html',
-  styleUrls: ['./result-panel.component.scss']
-})
-export class RowModalComponent {
-  // when modal is opened, currentDisplayRow will be passed as
-  //  componentInstance to this NgbModalComponent to display
-  //  as data table.
-  @Input() currentDisplayRowData: object = {};
-
-  // Index of currentDisplayRowData in currentResult
-  @Input() currentDisplayRowIndex: number = 0;
-
-  constructor(public modal: NzModalRef<any, number>) { }
-
-}
-

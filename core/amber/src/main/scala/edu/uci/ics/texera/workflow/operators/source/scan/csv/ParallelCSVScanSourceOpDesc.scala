@@ -14,7 +14,7 @@ import edu.uci.ics.texera.workflow.common.tuple.schema.{
   Schema
 }
 import edu.uci.ics.texera.workflow.operators.source.scan.ScanSourceOpDesc
-import org.codehaus.jackson.map.annotate.JsonDeserialize
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 
 import java.io.{File, IOException}
 import scala.jdk.CollectionConverters.asJavaIterableConverter
@@ -43,7 +43,7 @@ class ParallelCSVScanSourceOpDesc extends ScanSourceOpDesc {
     filePath match {
       case Some(path) =>
         val totalBytes: Long = new File(path).length()
-        val numWorkers: Int = Constants.defaultNumWorkers
+        val numWorkers: Int = Constants.currentWorkerNum
 
         new OneToOneOpExecConfig(
           operatorIdentifier,

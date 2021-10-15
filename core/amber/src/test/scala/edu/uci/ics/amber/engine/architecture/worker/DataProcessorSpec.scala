@@ -2,56 +2,58 @@ package edu.uci.ics.amber.engine.architecture.worker
 
 import akka.actor.ActorContext
 import com.softwaremill.macwire.wire
-import edu.uci.ics.amber.engine.architecture.controller.promisehandlers.WorkerExecutionCompletedHandler.WorkerExecutionCompleted
 import edu.uci.ics.amber.engine.architecture.messaginglayer.{
   BatchToTupleConverter,
-  ControlOutputPort,
-  DataOutputPort,
+  NetworkOutputPort,
   TupleToBatchConverter
 }
 import edu.uci.ics.amber.engine.architecture.worker.WorkerInternalQueue._
 import edu.uci.ics.amber.engine.architecture.worker.promisehandlers.PauseHandler.PauseWorker
 import edu.uci.ics.amber.engine.architecture.worker.promisehandlers.QueryStatisticsHandler.QueryStatistics
 import edu.uci.ics.amber.engine.architecture.worker.promisehandlers.ResumeHandler.ResumeWorker
-import edu.uci.ics.amber.engine.common.ambermessage.ControlPayload
+import edu.uci.ics.amber.engine.architecture.worker.statistics.WorkerState.{COMPLETED, RUNNING}
+import edu.uci.ics.amber.engine.common.InputExhausted
+import edu.uci.ics.amber.engine.common.ambermessage.{ControlPayload, DataPayload}
 import edu.uci.ics.amber.engine.common.rpc.AsyncRPCClient.ControlInvocation
-import edu.uci.ics.amber.engine.common.rpc.AsyncRPCServer.{CommandCompleted, ControlCommand}
-import edu.uci.ics.amber.engine.common.{InputExhausted, WorkflowLogger}
+import edu.uci.ics.amber.engine.common.rpc.AsyncRPCServer.ControlCommand
 import edu.uci.ics.amber.engine.common.rpc.{AsyncRPCClient, AsyncRPCServer}
 import edu.uci.ics.amber.engine.common.statetransition.WorkerStateManager
-import edu.uci.ics.amber.engine.common.statetransition.WorkerStateManager.{
-  Completed,
-  Ready,
-  Running
-}
 import edu.uci.ics.amber.engine.common.tuple.ITuple
-import edu.uci.ics.amber.engine.common.virtualidentity.ActorVirtualIdentity.WorkerActorVirtualIdentity
+import edu.uci.ics.amber.engine.common.virtualidentity.util.CONTROLLER
 import edu.uci.ics.amber.engine.common.virtualidentity.{
   ActorVirtualIdentity,
   LayerIdentity,
   LinkIdentity
 }
 import edu.uci.ics.texera.workflow.common.operators.OperatorExecutor
-import lbmq.LinkedBlockingMultiQueue
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 
-import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 class DataProcessorSpec extends AnyFlatSpec with MockFactory with BeforeAndAfterEach {
-  lazy val logger: WorkflowLogger = WorkflowLogger("testDP")
   lazy val pauseManager: PauseManager = wire[PauseManager]
-  lazy val dataOutputPort: DataOutputPort = mock[DataOutputPort]
+  lazy val identifier: ActorVirtualIdentity = ActorVirtualIdentity("DP mock")
+  lazy val mockDataHandler
+      : (ActorVirtualIdentity, ActorVirtualIdentity, Long, DataPayload) => Unit =
+    mock[(ActorVirtualIdentity, ActorVirtualIdentity, Long, DataPayload) => Unit]
+  lazy val mockControlHandler
+      : (ActorVirtualIdentity, ActorVirtualIdentity, Long, ControlPayload) => Unit =
+    mock[(ActorVirtualIdentity, ActorVirtualIdentity, Long, ControlPayload) => Unit]
+  lazy val mockDataOutputPort: NetworkOutputPort[DataPayload] =
+    new NetworkOutputPort[DataPayload](identifier, mockDataHandler)
+  lazy val controlOutputPort: NetworkOutputPort[ControlPayload] =
+    new NetworkOutputPort[ControlPayload](identifier, mockControlHandler)
   lazy val batchProducer: TupleToBatchConverter = mock[TupleToBatchConverter]
   lazy val breakpointManager: BreakpointManager = mock[BreakpointManager]
-  lazy val controlOutputPort: ControlOutputPort = mock[ControlOutputPort]
   val linkID: LinkIdentity =
-    LinkIdentity(LayerIdentity("testDP", "mockOp", "src"), LayerIdentity("testDP", "mockOp", "dst"))
+    LinkIdentity(
+      LayerIdentity("testDP", "mockOp", "src"),
+      LayerIdentity("testDP", "mockOp", "dst")
+    )
   val tuples: Seq[ITuple] = (0 until 400).map(ITuple(_))
-
-  case class DummyControl() extends ControlCommand[CommandCompleted]
 
   def sendDataToDP(dp: DataProcessor, data: Seq[ITuple], interval: Long = -1): Future[_] = {
     Future {
@@ -74,7 +76,7 @@ class DataProcessorSpec extends AnyFlatSpec with MockFactory with BeforeAndAfter
   ): Future[_] = {
     Future {
       control.foreach { x =>
-        dp.enqueueCommand(x, ActorVirtualIdentity.Controller)
+        dp.enqueueCommand(x, CONTROLLER)
         if (interval > 0) {
           Thread.sleep(interval)
         }
@@ -87,10 +89,10 @@ class DataProcessorSpec extends AnyFlatSpec with MockFactory with BeforeAndAfter
       timeout: FiniteDuration = 5.seconds
   ): Unit = {
     val deadline = timeout.fromNow
-    while (deadline.hasTimeLeft() && workerStateManager.getCurrentState != Completed) {
+    while (deadline.hasTimeLeft() && workerStateManager.getCurrentState != COMPLETED) {
       //wait
     }
-    assert(workerStateManager.getCurrentState == Completed)
+    assert(workerStateManager.getCurrentState == COMPLETED)
   }
 
   def waitForControlProcessing(dp: DataProcessor, timeout: FiniteDuration = 5.seconds): Unit = {
@@ -101,14 +103,16 @@ class DataProcessorSpec extends AnyFlatSpec with MockFactory with BeforeAndAfter
     assert(dp.isControlQueueEmpty)
   }
 
+  case class DummyControl() extends ControlCommand[Unit]
+
   "data processor" should "process data messages" in {
     val asyncRPCClient: AsyncRPCClient = mock[AsyncRPCClient]
     val operator = mock[OperatorExecutor]
     val asyncRPCServer: AsyncRPCServer = null
-    val workerStateManager: WorkerStateManager = new WorkerStateManager(Running)
+    val workerStateManager: WorkerStateManager = new WorkerStateManager(RUNNING)
     inAnyOrder {
       (batchProducer.emitEndOfUpstream _).expects().anyNumberOfTimes()
-      (asyncRPCClient.send[CommandCompleted] _).expects(*, *).anyNumberOfTimes()
+      (asyncRPCClient.send[Unit] _).expects(*, *).anyNumberOfTimes()
       inSequence {
         (operator.open _).expects().once()
         tuples.foreach { x =>
@@ -129,11 +133,11 @@ class DataProcessorSpec extends AnyFlatSpec with MockFactory with BeforeAndAfter
   "data processor" should "prioritize control messages" in {
     val asyncRPCClient: AsyncRPCClient = mock[AsyncRPCClient]
     val operator = mock[OperatorExecutor]
-    val workerStateManager: WorkerStateManager = new WorkerStateManager(Running)
+    val workerStateManager: WorkerStateManager = new WorkerStateManager(RUNNING)
     val asyncRPCServer: AsyncRPCServer = mock[AsyncRPCServer]
     inAnyOrder {
       (asyncRPCServer.logControlInvocation _).expects(*, *).anyNumberOfTimes()
-      (asyncRPCClient.send[CommandCompleted] _).expects(*, *).anyNumberOfTimes()
+      (asyncRPCClient.send[Unit] _).expects(*, *).anyNumberOfTimes()
       inSequence {
         (operator.open _).expects().once()
         inAnyOrder {
@@ -165,12 +169,12 @@ class DataProcessorSpec extends AnyFlatSpec with MockFactory with BeforeAndAfter
   "data processor" should "process control command without inputting data" in {
     val asyncRPCClient: AsyncRPCClient = mock[AsyncRPCClient]
     val operator = mock[OperatorExecutor]
-    val workerStateManager: WorkerStateManager = new WorkerStateManager(Running)
+    val workerStateManager: WorkerStateManager = new WorkerStateManager(RUNNING)
     val asyncRPCServer: AsyncRPCServer = mock[AsyncRPCServer]
     inAnyOrder {
       (operator.open _).expects().once()
       (asyncRPCServer.logControlInvocation _).expects(*, *).anyNumberOfTimes()
-      (asyncRPCClient.send[CommandCompleted] _).expects(*, *).anyNumberOfTimes()
+      (asyncRPCClient.send[Unit] _).expects(*, *).anyNumberOfTimes()
       (asyncRPCServer.receive _).expects(*, *).repeat(3)
       (operator.close _).expects().once()
     }
@@ -184,7 +188,7 @@ class DataProcessorSpec extends AnyFlatSpec with MockFactory with BeforeAndAfter
   }
 
   "data processor" should "process only control commands while paused" in {
-    val id = WorkerActorVirtualIdentity("test")
+    val id = ActorVirtualIdentity("test")
     val operator = mock[OperatorExecutor]
     (operator.open _).expects().once()
     val ctx: ActorContext = null
@@ -192,26 +196,26 @@ class DataProcessorSpec extends AnyFlatSpec with MockFactory with BeforeAndAfter
     val asyncRPCClient: AsyncRPCClient = mock[AsyncRPCClient]
     (asyncRPCClient.send _).expects(*, *).anyNumberOfTimes()
     val asyncRPCServer: AsyncRPCServer = wire[AsyncRPCServer]
-    val workerStateManager: WorkerStateManager = new WorkerStateManager(Running)
+    val workerStateManager: WorkerStateManager = new WorkerStateManager(RUNNING)
     val dp: DataProcessor = wire[DataProcessor]
     val handlerInitializer = wire[WorkerAsyncRPCHandlerInitializer]
     inSequence {
       (operator.processTuple _).expects(*, *).once()
-      (controlOutputPort.sendTo _).expects(*, *).repeat(4)
+      (mockControlHandler.apply _).expects(*, *, *, *).repeat(4)
       (operator.processTuple _).expects(*, *).repeat(4)
       (batchProducer.emitEndOfUpstream _).expects().once()
       (operator.close _).expects().once()
     }
     dp.appendElement(InputTuple(ITuple(1)))
     Thread.sleep(500)
-    dp.enqueueCommand(ControlInvocation(0, PauseWorker()), ActorVirtualIdentity.Controller)
+    dp.enqueueCommand(ControlInvocation(0, PauseWorker()), CONTROLLER)
     dp.appendElement(InputTuple(ITuple(2)))
-    dp.enqueueCommand(ControlInvocation(1, QueryStatistics()), ActorVirtualIdentity.Controller)
+    dp.enqueueCommand(ControlInvocation(1, QueryStatistics()), CONTROLLER)
     Thread.sleep(1000)
     dp.appendElement(InputTuple(ITuple(3)))
-    dp.enqueueCommand(ControlInvocation(2, QueryStatistics()), ActorVirtualIdentity.Controller)
+    dp.enqueueCommand(ControlInvocation(2, QueryStatistics()), CONTROLLER)
     dp.appendElement(InputTuple(ITuple(4)))
-    dp.enqueueCommand(ControlInvocation(3, ResumeWorker()), ActorVirtualIdentity.Controller)
+    dp.enqueueCommand(ControlInvocation(3, ResumeWorker()), CONTROLLER)
     dp.appendElement(EndMarker)
     dp.appendElement(EndOfAllMarker)
     waitForControlProcessing(dp)

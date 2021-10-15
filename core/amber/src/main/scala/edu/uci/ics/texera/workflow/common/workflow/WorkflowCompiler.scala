@@ -1,25 +1,56 @@
 package edu.uci.ics.texera.workflow.common.workflow
 
 import akka.actor.ActorRef
+import edu.uci.ics.amber.engine.architecture.breakpoint.globalbreakpoint.{
+  ConditionalGlobalBreakpoint,
+  CountGlobalBreakpoint
+}
 import edu.uci.ics.amber.engine.architecture.controller.Workflow
-import edu.uci.ics.amber.engine.common.virtualidentity.{LinkIdentity, OperatorIdentity}
+import edu.uci.ics.amber.engine.architecture.controller.promisehandlers.AssignBreakpointHandler.AssignGlobalBreakpoint
+import edu.uci.ics.amber.engine.common.AmberClient
+import edu.uci.ics.amber.engine.common.rpc.AsyncRPCClient
+import edu.uci.ics.amber.engine.common.rpc.AsyncRPCClient.ControlInvocation
+import edu.uci.ics.amber.engine.common.virtualidentity.{
+  LinkIdentity,
+  OperatorIdentity,
+  WorkflowIdentity
+}
 import edu.uci.ics.amber.engine.operators.OpExecConfig
-import edu.uci.ics.texera.workflow.common.{ConstraintViolation, WorkflowContext}
 import edu.uci.ics.texera.workflow.common.operators.OperatorDescriptor
 import edu.uci.ics.texera.workflow.common.operators.source.SourceOperatorDescriptor
 import edu.uci.ics.texera.workflow.common.tuple.Tuple
-import edu.uci.ics.texera.workflow.common.tuple.schema.{Schema, OperatorSchemaInfo}
-import org.jgrapht.graph.{DefaultEdge, DirectedAcyclicGraph}
+import edu.uci.ics.texera.workflow.common.tuple.schema.{OperatorSchemaInfo, Schema}
+import edu.uci.ics.texera.workflow.common.{ConstraintViolation, WorkflowContext}
+import edu.uci.ics.texera.workflow.operators.sink.SimpleSinkOpDesc
+import edu.uci.ics.texera.workflow.operators.visualization.VisualizationOperator
 
 import scala.collection.mutable
 
-class WorkflowCompiler(val workflowInfo: WorkflowInfo, val context: WorkflowContext) {
+object WorkflowCompiler {
 
-  init()
-
-  def init(): Unit = {
-    this.workflowInfo.operators.foreach(initOperator)
+  def isSink(operatorID: String, workflowCompiler: WorkflowCompiler): Boolean = {
+    val outLinks =
+      workflowCompiler.workflowInfo.links.filter(link => link.origin.operatorID == operatorID)
+    outLinks.isEmpty
   }
+
+  def getUpstreamOperators(
+      operatorID: String,
+      workflowCompiler: WorkflowCompiler
+  ): List[OperatorDescriptor] = {
+    workflowCompiler.workflowInfo.links
+      .filter(link => link.destination.operatorID == operatorID)
+      .flatMap(link =>
+        workflowCompiler.workflowInfo.operators.filter(o => o.operatorID == link.origin.operatorID)
+      )
+      .toList
+  }
+
+}
+
+class WorkflowCompiler(val workflowInfo: WorkflowInfo, val context: WorkflowContext) {
+  val workflow = new WorkflowDAG(workflowInfo)
+  workflow.operators.values.foreach(initOperator)
 
   def initOperator(operator: OperatorDescriptor): Unit = {
     operator.setContext(context)
@@ -35,7 +66,22 @@ class WorkflowCompiler(val workflowInfo: WorkflowInfo, val context: WorkflowCont
       .toMap
       .filter(pair => pair._2.nonEmpty)
 
-  def amberWorkflow: Workflow = {
+  def amberWorkflow(workflowId: WorkflowIdentity): Workflow = {
+    // pre-process: set output mode for sink based on the visualization operator before it
+    this.workflow.getSinkOperators.foreach(sinkOpId => {
+      val sinkOp = this.workflow.getOperator(sinkOpId)
+      val upstream = this.workflow.getUpstream(sinkOpId)
+      if (upstream.nonEmpty) {
+        (upstream.head, sinkOp) match {
+          // match the combination of a visualization operator followed by a sink operator
+          case (viz: VisualizationOperator, sink: SimpleSinkOpDesc) =>
+            sink.setOutputMode(viz.outputMode())
+            sink.setChartType(viz.chartType())
+          case _ =>
+        }
+      }
+    })
+
     val inputSchemaMap = propagateWorkflowSchema()
     val amberOperators: mutable.Map[OperatorIdentity, OpExecConfig] = mutable.Map()
     workflowInfo.operators.foreach(o => {
@@ -50,11 +96,10 @@ class WorkflowCompiler(val workflowInfo: WorkflowInfo, val context: WorkflowCont
 
     val outLinks: mutable.Map[OperatorIdentity, mutable.Set[OperatorIdentity]] = mutable.Map()
     workflowInfo.links.foreach(link => {
-      val origin = OperatorIdentity(this.context.jobID, link.origin.operatorID)
-      val dest = OperatorIdentity(this.context.jobID, link.destination.operatorID)
-      val destSet = outLinks.getOrElse(origin, mutable.Set())
-      destSet.add(dest)
-      outLinks.update(origin, destSet)
+      val origin = OperatorIdentity(this.context.jobId, link.origin.operatorID)
+      val dest = OperatorIdentity(this.context.jobId, link.destination.operatorID)
+      outLinks.getOrElseUpdate(origin, mutable.Set()).add(dest)
+
       val layerLink = LinkIdentity(
         amberOperators(origin).topology.layers.last.id,
         amberOperators(dest).topology.layers.head.id
@@ -62,90 +107,22 @@ class WorkflowCompiler(val workflowInfo: WorkflowInfo, val context: WorkflowCont
       amberOperators(dest).setInputToOrdinalMapping(layerLink, link.destination.portOrdinal)
     })
 
-    val outLinksImmutableValue: mutable.Map[OperatorIdentity, Set[OperatorIdentity]] =
-      mutable.Map()
-    outLinks.foreach(entry => {
-      outLinksImmutableValue.update(entry._1, entry._2.toSet)
-    })
     val outLinksImmutable: Map[OperatorIdentity, Set[OperatorIdentity]] =
-      outLinksImmutableValue.toMap
+      outLinks.map({ case (operatorId, links) => operatorId -> links.toSet }).toMap
 
-    new Workflow(amberOperators, outLinksImmutable)
-  }
-
-  def initializeBreakpoint(controller: ActorRef): Unit = {
-    for (pair <- this.workflowInfo.breakpoints) {
-      addBreakpoint(controller, pair.operatorID, pair.breakpoint)
-    }
-  }
-
-  def addBreakpoint(
-      controller: ActorRef,
-      operatorID: String,
-      breakpoint: Breakpoint
-  ): Unit = {
-    val breakpointID = "breakpoint-" + operatorID
-    breakpoint match {
-      case conditionBp: ConditionBreakpoint =>
-        val column = conditionBp.column
-        val predicate: Tuple => Boolean = conditionBp.condition match {
-          case BreakpointCondition.EQ =>
-            tuple => {
-              tuple.getField(column).toString.trim == conditionBp.value
-            }
-          case BreakpointCondition.LT =>
-            tuple => tuple.getField(column).toString.trim < conditionBp.value
-          case BreakpointCondition.LE =>
-            tuple => tuple.getField(column).toString.trim <= conditionBp.value
-          case BreakpointCondition.GT =>
-            tuple => tuple.getField(column).toString.trim > conditionBp.value
-          case BreakpointCondition.GE =>
-            tuple => tuple.getField(column).toString.trim >= conditionBp.value
-          case BreakpointCondition.NE =>
-            tuple => tuple.getField(column).toString.trim != conditionBp.value
-          case BreakpointCondition.CONTAINS =>
-            tuple => tuple.getField(column).toString.trim.contains(conditionBp.value)
-          case BreakpointCondition.NOT_CONTAINS =>
-            tuple => !tuple.getField(column).toString.trim.contains(conditionBp.value)
-        }
-      //TODO: add new handling logic here
-//        controller ! PassBreakpointTo(
-//          operatorID,
-//          new ConditionalGlobalBreakpoint(
-//            breakpointID,
-//            tuple => {
-//              val texeraTuple = tuple.asInstanceOf[Tuple]
-//              predicate.apply(texeraTuple)
-//            }
-//          )
-//        )
-      case countBp: CountBreakpoint =>
-//        controller ! PassBreakpointTo(
-//          operatorID,
-//          new CountGlobalBreakpoint("breakpointID", countBp.count)
-//        )
-    }
+    new Workflow(workflowId, amberOperators, outLinksImmutable)
   }
 
   def propagateWorkflowSchema(): Map[OperatorDescriptor, List[Option[Schema]]] = {
-    // construct the edu.uci.ics.texera.workflow DAG object using jGraphT
-    val workflowDag =
-      new DirectedAcyclicGraph[OperatorDescriptor, DefaultEdge](classOf[DefaultEdge])
-    this.workflowInfo.operators.foreach(op => workflowDag.addVertex(op))
-    this.workflowInfo.links.foreach(link => {
-      val origin = workflowInfo.operators.find(op => op.operatorID == link.origin.operatorID).get
-      val dest = workflowInfo.operators.find(op => op.operatorID == link.destination.operatorID).get
-      workflowDag.addEdge(origin, dest)
-    })
-
     // a map from an operator to the list of its input schema
     val inputSchemaMap =
       new mutable.HashMap[OperatorDescriptor, mutable.MutableList[Option[Schema]]]()
         .withDefault(op => mutable.MutableList.fill(op.operatorInfo.inputPorts.size)(Option.empty))
 
     // propagate output schema following topological order
-    val topologicalOrderIterator = workflowDag.iterator()
-    topologicalOrderIterator.forEachRemaining(op => {
+    val topologicalOrderIterator = workflow.jgraphtDag.iterator()
+    topologicalOrderIterator.forEachRemaining(opID => {
+      val op = workflow.getOperator(opID)
       // infer output schema of this operator based on its input schema
       val outputSchema: Option[Schema] = {
         // call to "getOutputSchema" might cause exceptions, wrap in try/catch and return empty schema
@@ -189,6 +166,61 @@ class WorkflowCompiler(val workflowInfo: WorkflowInfo, val context: WorkflowCont
       .filter(e => !(e._2.exists(s => s.isEmpty) || e._2.isEmpty))
       .map(e => (e._1, e._2.toList))
       .toMap
+  }
+
+  def initializeBreakpoint(client: AmberClient): Unit = {
+    for (pair <- this.workflowInfo.breakpoints) {
+      addBreakpoint(client, pair.operatorID, pair.breakpoint)
+    }
+  }
+
+  def addBreakpoint(
+      client: AmberClient,
+      operatorID: String,
+      breakpoint: Breakpoint
+  ): Unit = {
+    val breakpointID = "breakpoint-" + operatorID + "-" + System.currentTimeMillis()
+    breakpoint match {
+      case conditionBp: ConditionBreakpoint =>
+        val column = conditionBp.column
+        val predicate: Tuple => Boolean = conditionBp.condition match {
+          case BreakpointCondition.EQ =>
+            tuple => {
+              tuple.getField(column).toString.trim == conditionBp.value
+            }
+          case BreakpointCondition.LT =>
+            tuple => tuple.getField(column).toString.trim < conditionBp.value
+          case BreakpointCondition.LE =>
+            tuple => tuple.getField(column).toString.trim <= conditionBp.value
+          case BreakpointCondition.GT =>
+            tuple => tuple.getField(column).toString.trim > conditionBp.value
+          case BreakpointCondition.GE =>
+            tuple => tuple.getField(column).toString.trim >= conditionBp.value
+          case BreakpointCondition.NE =>
+            tuple => tuple.getField(column).toString.trim != conditionBp.value
+          case BreakpointCondition.CONTAINS =>
+            tuple => tuple.getField(column).toString.trim.contains(conditionBp.value)
+          case BreakpointCondition.NOT_CONTAINS =>
+            tuple => !tuple.getField(column).toString.trim.contains(conditionBp.value)
+        }
+
+        client.fireAndForget(
+          AssignGlobalBreakpoint(
+            new ConditionalGlobalBreakpoint(
+              breakpointID,
+              tuple => {
+                val texeraTuple = tuple.asInstanceOf[Tuple]
+                predicate.apply(texeraTuple)
+              }
+            ),
+            operatorID
+          )
+        )
+      case countBp: CountBreakpoint =>
+        client.fireAndForget(
+          AssignGlobalBreakpoint(new CountGlobalBreakpoint(breakpointID, countBp.count), operatorID)
+        )
+    }
   }
 
 }

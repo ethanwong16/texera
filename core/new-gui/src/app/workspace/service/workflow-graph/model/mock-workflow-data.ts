@@ -68,13 +68,12 @@ export const mockMultiInputOutputPredicate: OperatorPredicate = {
 };
 
 export const mockPresetEnabledPredicate: OperatorPredicate = {
-  operatorID: '5',
-  operatorType: 'PresetEnabledOp',
-  operatorProperties: {
-  },
+  operatorID: "5",
+  operatorType: "PresetEnabledOp",
+  operatorProperties: {},
   inputPorts: [],
   outputPorts: [],
-  showAdvanced: true
+  showAdvanced: true,
 };
 
 export const mockScanResultLink: OperatorLink = {

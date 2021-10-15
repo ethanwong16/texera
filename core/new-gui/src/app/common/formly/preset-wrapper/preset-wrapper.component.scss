@@ -1,7 +1,7 @@
 ::ng-deep .preset-dropdown {
   transform: translateY(4px) !important;
   &.no-results {
-    display:none;
+    display: none;
   }
   .preset-menu {
     max-height: 150px;
@@ -10,22 +10,22 @@
   .preset-dropdown-item {
     pointer-events: auto;
     display: flex;
-    .dropdown-entry{
+    .dropdown-entry {
       flex-grow: 1;
       display: flex;
       overflow: hidden;
       .title {
         text-align: left;
-        margin-right: .8em;
+        margin-right: 0.8em;
         font-size: 1.1em;
         text-overflow: ellipsis;
         overflow: hidden;
       }
       .description {
         flex-grow: 1;
-        font-size: .7em;
+        font-size: 0.7em;
         text-align: right;
-        color: rgba(0,0,0,.45);
+        color: rgba(0, 0, 0, 0.45);
         font-style: italic;
         text-overflow: ellipsis;
         overflow: hidden;
@@ -39,7 +39,7 @@
       justify-content: center;
       opacity: 0.1;
       &:hover {
-        opacity:1;
+        opacity: 1;
       }
     }
   }

@@ -12,11 +12,11 @@ module.exports = function (config) {
       require("karma-coverage-istanbul-reporter"),
       require("@angular-devkit/build-angular/plugins/karma"),
     ],
-    client:{
+    client: {
       clearContext: false, // leave Jasmine Spec Runner output visible in browser
       jasmine: {
-        random: false // disable the random running order
-      }
+        random: false, // disable the random running order
+      },
     },
     coverageIstanbulReporter: {
       dir: require("path").join(__dirname, "coverage"),

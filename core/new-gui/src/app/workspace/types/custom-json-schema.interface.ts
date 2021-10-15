@@ -11,7 +11,7 @@ export interface CustomJSONSchema7 extends JSONSchema7 {
   autofill?: "attributeName" | "attributeNameList";
   autofillAttributeOnPort?: number;
 
-  'enable-presets'?: boolean; // include property in schema of preset
+  "enable-presets"?: boolean; // include property in schema of preset
 
   dependOn?: string;
   toggleHidden?: string[]; // the field names which will be toggle hidden or not by this field.

@@ -1,12 +1,12 @@
-import { Component, Input, OnChanges, OnInit, SimpleChanges } from "@angular/core";
+import { Component, ElementRef, Input, OnChanges, OnInit, SimpleChanges, ViewChild } from "@angular/core";
 import { ExecuteWorkflowService } from "../../../service/execute-workflow/execute-workflow.service";
-import { Subject } from "rxjs";
+import { ReplaySubject, Subject } from "rxjs";
 import { FormGroup } from "@angular/forms";
 import { FormlyFieldConfig, FormlyFormOptions } from "@ngx-formly/core";
 import * as Ajv from "ajv";
 import { FormlyJsonschema } from "@ngx-formly/core/json-schema";
 import { WorkflowActionService } from "../../../service/workflow-graph/model/workflow-action.service";
-import { cloneDeep, isEqual } from "lodash-es";
+import { cloneDeep, isEqual, every, findIndex } from "lodash-es";
 import { CustomJSONSchema7 } from "../../../types/custom-json-schema.interface";
 import { isDefined } from "../../../../common/util/predicate";
 import { ExecutionState } from "src/app/workspace/types/execute-workflow.interface";
@@ -26,8 +26,12 @@ import {
 } from "../typecasting-display/type-casting-display.component";
 import { DynamicComponentConfig } from "../../../../common/type/dynamic-component-config";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
-import { filter } from "rxjs/operators";
+import { filter, takeUntil } from "rxjs/operators";
 import { NotificationService } from "../../../../common/service/notification/notification.service";
+import { Preset, PresetService } from "src/app/workspace/service/preset/preset.service";
+import { isType, nonNull } from "src/app/common/util/assert";
+import { OperatorMetadataService } from "src/app/workspace/service/operator-metadata/operator-metadata.service";
+import { PresetWrapperComponent } from "src/app/common/formly/preset-wrapper/preset-wrapper.component";
 
 export type PropertyDisplayComponent = TypeCastingDisplayComponent;
 
@@ -87,13 +91,28 @@ export class OperatorPropertyEditFrameComponent implements OnInit, OnChanges {
   // for display component of some extra information
   extraDisplayComponentConfig?: PropertyDisplayComponentConfig;
 
+  // vars used in form preset feature. TODO: separate this logic into it's own mini-service
+  @ViewChild("promptSavePresetDialogButton") promptSaveDialogButton?: ElementRef<HTMLAnchorElement>;
+  public presetContext = {
+    hasPresetFields: false,
+    showPrompt: false,
+    resolvePrompt: (ok: boolean) => {},
+    promptResult: Promise.resolve(false),
+    originalPreset: <Preset | null>null,
+  };
+
+  // used to tear down subscriptions that takeUntil(teardownObservable)
+  private teardownObservable: ReplaySubject<boolean> = new ReplaySubject(1);
+
   constructor(
     private formlyJsonschema: FormlyJsonschema,
     private workflowActionService: WorkflowActionService,
     public executeWorkflowService: ExecuteWorkflowService,
     private dynamicSchemaService: DynamicSchemaService,
     private schemaPropagationService: SchemaPropagationService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private operatorMetadataService: OperatorMetadataService,
+    private presetService: PresetService
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -127,6 +146,9 @@ export class OperatorPropertyEditFrameComponent implements OnInit, OnChanges {
     this.registerOnFormChangeHandler();
 
     this.registerDisableEditorInteractivityHandler();
+
+    // handle applying presets
+    this.handleApplyPreset();
   }
 
   /**
@@ -158,6 +180,19 @@ export class OperatorPropertyEditFrameComponent implements OnInit, OnChanges {
      * Prevent the form directly changes the value in the texera graph without going through workflow action service.
      */
     this.formData = cloneDeep(operator.operatorProperties);
+
+    // if form has preset fields, setup presetContext
+    const form_has_preset_fields = Object.values(nonNull(currentOperatorSchema.jsonSchema.properties)).some(
+      property => !isType(property, "boolean") && property["enable-presets"]
+    );
+    if (form_has_preset_fields) {
+      const startingPreset = this.filterPresetFromForm(operator.operatorType, this.formData);
+      const presets = this.presetService.getPresets("operator", operator.operatorType);
+      const presetIndex = findIndex(presets, preset => isEqual(preset, startingPreset));
+
+      this.presetContext.hasPresetFields = true;
+      this.presetContext.originalPreset = presetIndex === -1 ? null : startingPreset;
+    }
 
     // use ajv to initialize the default value to data according to schema, see https://ajv.js.org/#assigning-defaults
     // WorkflowUtil service also makes sure that the default values are filled in when operator is added from the UI
@@ -299,6 +334,19 @@ export class OperatorPropertyEditFrameComponent implements OnInit, OnChanges {
           mappedField.type = "codearea";
         }
       }
+      // if presetService is ready and operator property allows presets, setup formly field to display presets
+      if (
+        this.presetService.ready.value === true &&
+        mapSource["enable-presets"] !== undefined &&
+        this.currentOperatorId !== undefined
+      ) {
+        PresetWrapperComponent.setupFieldConfig(
+          mappedField,
+          "operator",
+          this.workflowActionService.getTexeraGraph().getOperator(this.currentOperatorId).operatorType,
+          this.currentOperatorId
+        );
+      }
       return mappedField;
     };
 
@@ -371,5 +419,111 @@ export class OperatorPropertyEditFrameComponent implements OnInit, OnChanges {
     }
 
     this.editingTitle = false;
+  }
+
+  promptSavePreset(): Promise<boolean> {
+    // init presetContext for dialog to bind to
+    this.presetContext.promptResult = new Promise<boolean>(_resolve => {
+      this.presetContext.resolvePrompt = _resolve;
+    });
+
+    // show dialog
+    this.presetContext.showPrompt = true;
+    nonNull(this.promptSaveDialogButton).nativeElement.click();
+
+    // handle dialog results
+    this.presetContext.promptResult.then((save: boolean) => {
+      this.presetContext.showPrompt = false;
+      if (save === true) {
+        this.saveOperatorPresets();
+      }
+    });
+
+    return this.presetContext.promptResult;
+  }
+
+  /**
+   * attempts to save current property editor form data as an operator preset
+   */
+  saveOperatorPresets() {
+    if (
+      this.currentOperatorId === undefined ||
+      this.formData === undefined ||
+      this.presetContext.hasPresetFields === false
+    ) {
+      throw Error("Attempted to save operator preset when no preset is available");
+    }
+
+    const operatorType = this.operatorMetadataService.getOperatorSchema(
+      this.workflowActionService.getTexeraGraph().getOperator(this.currentOperatorId).operatorType
+    ).operatorType;
+    const newPreset = this.filterPresetFromForm(operatorType, this.formData);
+    let presets = this.presetService.getPresets("operator", operatorType).slice(); // shallow copy
+
+    const preset_is_valid = this.presetService.isValidOperatorPreset(newPreset, this.currentOperatorId);
+    const preset_is_not_a_repeat = every(presets, preset => !isEqual(preset, newPreset));
+    const preset_is_an_edit = this.presetContext.originalPreset !== null;
+
+    if (!preset_is_valid) throw Error(`Attempted to save invalid preset ${newPreset}`);
+    if (!preset_is_not_a_repeat) throw Error(`Attempted to save preset ${newPreset} that already exists`);
+    if (preset_is_an_edit) presets = presets.filter(preset => !isEqual(preset, this.presetContext.originalPreset));
+
+    presets.push(newPreset);
+    this.presetService.savePresets("operator", operatorType, presets);
+  }
+
+  /**
+   * resets PropertyEditor so that something else can be edited
+   * If it was editing an operator, check if a preset was should be created/saved
+   */
+  public async resetPropertyEditor() {
+    const form_is_dirty = this.formlyFields !== undefined && this.formlyFields.some(field => field.formControl?.dirty);
+    const form_has_preset_fields = this.presetContext.hasPresetFields;
+    const form_preset_is_an_edit = this.presetContext.originalPreset !== null;
+    const form_preset_is_valid =
+      this.currentOperatorId !== undefined &&
+      form_has_preset_fields &&
+      this.presetService.isValidNewOperatorPreset(
+        this.filterPresetFromForm(
+          this.operatorMetadataService.getOperatorSchema(
+            // there should be an easier way to get operator schema from operator ID, but I don't know how
+            this.workflowActionService.getTexeraGraph().getOperator(this.currentOperatorId).operatorType
+          ).operatorType,
+          this.formData
+        ),
+        this.currentOperatorId
+      );
+
+    if (this.presetService.ready.value === true && form_has_preset_fields && form_is_dirty && form_preset_is_valid) {
+      if (form_preset_is_an_edit) this.saveOperatorPresets();
+      else await this.promptSavePreset(); // form preset is novel, prompt user to save it
+    }
+  }
+
+  handleApplyPreset(): void {
+    this.presetService.applyPresetStream.pipe(takeUntil(this.teardownObservable)).subscribe({
+      next: applyEvent => {
+        if (
+          this.currentOperatorId !== undefined &&
+          this.currentOperatorId === applyEvent.target &&
+          this.presetService.isValidOperatorPreset(applyEvent.preset, this.currentOperatorId)
+        ) {
+          this.presetContext.originalPreset = applyEvent.preset;
+        }
+      },
+    });
+  }
+
+  /**
+   * Filters formData to only include members that are in the preset schema of the given operatorType
+   * @param operatorType
+   * @param formData
+   * @returns partially finished Preset. use PresetService.isValidOperatorPreset to verify all preset attributes exist
+   */
+  filterPresetFromForm(operatorType: string, formData: object): Preset {
+    return PresetService.filterOperatorPresetProperties(
+      this.operatorMetadataService.getOperatorSchema(operatorType).jsonSchema,
+      this.formData
+    );
   }
 }

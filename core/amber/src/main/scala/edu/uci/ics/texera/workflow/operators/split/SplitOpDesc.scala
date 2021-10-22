@@ -2,16 +2,11 @@ package edu.uci.ics.texera.workflow.operators.split
 
 import com.fasterxml.jackson.annotation.{JsonProperty, JsonPropertyDescription}
 import com.google.common.base.Preconditions
-import edu.uci.ics.texera.workflow.common.metadata.{
-  InputPort,
-  OperatorGroupConstants,
-  OperatorInfo,
-  OutputPort
-}
+import edu.uci.ics.texera.workflow.common.metadata.{InputPort, OperatorGroupConstants, OperatorInfo, OutputPort}
 import edu.uci.ics.texera.workflow.common.metadata.annotations.AutofillAttributeName
 import edu.uci.ics.texera.workflow.common.operators.OneToOneOpExecConfig
 import edu.uci.ics.texera.workflow.common.operators.flatmap.FlatMapOpDesc
-import edu.uci.ics.texera.workflow.common.tuple.schema.{OperatorSchemaInfo, Schema}
+import edu.uci.ics.texera.workflow.common.tuple.schema.{AttributeType, OperatorSchemaInfo, Schema}
 
 class SplitOpDesc extends FlatMapOpDesc {
   @JsonProperty(value = "delimiter", required = true)
@@ -22,6 +17,10 @@ class SplitOpDesc extends FlatMapOpDesc {
   @JsonPropertyDescription("column to split")
   @AutofillAttributeName
   var attribute: String = _
+
+  @JsonProperty(value="result attribute", required = true, defaultValue = "split")
+  @JsonPropertyDescription("column name of the split result")
+  var resultAttribute: String = _
 
   override def operatorInfo: OperatorInfo =
     OperatorInfo(
@@ -39,6 +38,7 @@ class SplitOpDesc extends FlatMapOpDesc {
 
   override def getOutputSchema(schemas: Array[Schema]): Schema = {
     Preconditions.checkArgument(schemas.forall(_ == schemas(0)))
-    schemas(0)
+    if (resultAttribute == null || resultAttribute.trim.isEmpty) return null
+    Schema.newBuilder.add(schemas(0)).add(resultAttribute, AttributeType.STRING).build
   }
 }

@@ -10,9 +10,10 @@ class SplitOpExec(opDesc: SplitOpDesc, operatorSchemaInfo: OperatorSchemaInfo)
   def splitByDelimiter(tuple: Tuple): Iterator[Tuple] = {
 
     val tupleValue = tuple.getField(this.opDesc.attribute).toString
-    val splitData = tupleValue.split(this.opDesc.delimiter).toIterator
+    val splitData = tupleValue.split(this.opDesc.delimiter)
+    val dataIterator = splitData.filter(!_.equals("")).toIterator
 
-    splitData.map(split => {
+    dataIterator.map(split => {
       Tuple
         .newBuilder(operatorSchemaInfo.outputSchema)
         .add(tuple)

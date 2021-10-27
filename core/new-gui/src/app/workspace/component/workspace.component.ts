@@ -83,6 +83,10 @@ export class WorkspaceComponent implements AfterViewInit, OnDestroy {
 
     this.registerResultPanelToggleHandler();
 
+    let wid = (this.workflowActionService.getWorkflowMetadata().wid) ?? 0;
+    this.workflowWebsocketService.openWebsocket(wid);
+    this.currentWid = wid;
+
     this.establishWebsocketConnectionIfWIdChanged();
 
   }

@@ -1,5 +1,5 @@
 import { Location } from "@angular/common";
-import { AfterViewInit, Component } from "@angular/core";
+import { AfterViewInit, Component, OnDestroy } from "@angular/core";
 import { ActivatedRoute } from "@angular/router";
 import { environment } from "../../../environments/environment";
 import { Version } from "../../../environments/version";
@@ -30,7 +30,7 @@ import { OperatorCacheStatusService } from "../service/workflow-status/operator-
     // { provide: OperatorMetadataService, useClass: StubOperatorMetadataService },
   ],
 })
-export class WorkspaceComponent implements AfterViewInit {
+export class WorkspaceComponent implements AfterViewInit, OnDestroy {
   public gitCommitHash: string = Version.raw;
   public showResultPanel: boolean = false;
   private currentWid = 0;

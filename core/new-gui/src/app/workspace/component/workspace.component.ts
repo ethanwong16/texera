@@ -33,7 +33,6 @@ import { OperatorCacheStatusService } from "../service/workflow-status/operator-
 export class WorkspaceComponent implements AfterViewInit, OnDestroy {
   public gitCommitHash: string = Version.raw;
   public showResultPanel: boolean = false;
-  private currentWid = 0;
   userSystemEnabled = environment.userSystemEnabled;
 
   constructor(
@@ -83,29 +82,14 @@ export class WorkspaceComponent implements AfterViewInit, OnDestroy {
 
     this.registerResultPanelToggleHandler();
 
-    let wid = (this.workflowActionService.getWorkflowMetadata().wid) ?? 0;
-    this.workflowWebsocketService.openWebsocket(wid);
-    this.currentWid = wid;
+    let wid = this.route.snapshot.params.id ?? 0;
 
-    this.establishWebsocketConnectionIfWIdChanged();
+    this.workflowWebsocketService.openWebsocket(wid);
 
   }
 
   ngOnDestroy(){
     this.workflowWebsocketService.closeWebsocket();
-  }
-
-  establishWebsocketConnectionIfWIdChanged(){
-    this.workflowActionService.workflowMetaDataChanged()
-    .pipe(untilDestroyed(this))
-    .subscribe(() => {
-      let wid = (this.workflowActionService.getWorkflowMetadata().wid) ?? 0;
-      if(wid != this.currentWid){
-        this.workflowWebsocketService.closeWebsocket();
-        this.workflowWebsocketService.openWebsocket(wid);
-        this.currentWid = wid;
-      }
-    });
   }
 
   registerResultPanelToggleHandler() {

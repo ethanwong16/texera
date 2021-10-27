@@ -16,9 +16,11 @@ import { WorkflowActionService } from "../service/workflow-graph/model/workflow-
 import { WorkflowWebsocketService } from "../service/workflow-websocket/workflow-websocket.service";
 import { NzMessageService } from "ng-zorro-antd/message";
 import { WorkflowConsoleService } from "../service/workflow-console/workflow-console.service";
-import { debounceTime, filter } from "rxjs/operators";
+import { debounceTime, distinctUntilChanged, filter, switchMap } from "rxjs/operators";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { OperatorCacheStatusService } from "../service/workflow-status/operator-cache-status.service";
+import { of } from "rxjs";
+import { isDefined } from "../../common/util/predicate";
 
 @UntilDestroy()
 @Component({
@@ -78,17 +80,14 @@ export class WorkspaceComponent implements AfterViewInit, OnDestroy {
     // clear the current workspace, reset as `WorkflowActionService.DEFAULT_WORKFLOW`
     this.workflowActionService.resetAsNewWorkflow();
 
+    this.registerReEstablishWebsocketUponWIdChange();
+
     this.registerLoadOperatorMetadata();
 
     this.registerResultPanelToggleHandler();
-
-    let wid = this.route.snapshot.params.id ?? 0;
-
-    this.workflowWebsocketService.openWebsocket(wid);
-
   }
 
-  ngOnDestroy(){
+  ngOnDestroy() {
     this.workflowWebsocketService.closeWebsocket();
   }
 
@@ -164,10 +163,10 @@ export class WorkspaceComponent implements AfterViewInit, OnDestroy {
       .pipe(filter(metadata => metadata.operators.length !== 0))
       .pipe(untilDestroyed(this))
       .subscribe(() => {
+        let wid = this.route.snapshot.params.id;
         if (environment.userSystemEnabled) {
           // load workflow with wid if presented in the URL
-          if (this.route.snapshot.params.id) {
-            const wid = this.route.snapshot.params.id;
+          if (wid) {
             // if wid is present in the url, load it from the backend
             this.userService
               .userChanged()
@@ -188,5 +187,17 @@ export class WorkspaceComponent implements AfterViewInit, OnDestroy {
           this.registerAutoCacheWorkFlow();
         }
       });
+  }
+
+  registerReEstablishWebsocketUponWIdChange() {
+    this.workflowActionService
+      .workflowMetaDataChanged()
+      .pipe(
+        switchMap(() => of(this.workflowActionService.getWorkflowMetadata().wid)),
+        filter(isDefined),
+        distinctUntilChanged()
+      )
+      .pipe(untilDestroyed(this))
+      .subscribe(wid => this.workflowWebsocketService.reopenWebsocket(wid));
   }
 }

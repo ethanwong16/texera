@@ -70,8 +70,8 @@ class WorkflowWebsocketResource extends LazyLogging {
           // hack to refresh frontend run button state
           send(session, WorkflowStateEvent(Uninitialized))
           val workflowState = uidOpt match {
-            case Some(username) =>
-              val workflowStateId = username + "-" + wIdRequest.wId
+            case Some(user) =>
+              val workflowStateId = user + "-" + wIdRequest.wId
               WorkflowService.getOrCreate(workflowStateId)
             case None =>
               // set immediately cleanup

@@ -36,25 +36,27 @@
   </nz-card>
 
   <nz-card class="workflow-list-container subsection-grid-container">
-    <nz-input-group [nzAddOnBefore]="addOnBeforeTemplate" class="texera-dashboard-saved-workflow-search-box-input">
+    <nz-input-group [nzSuffix]="suffixIconSearch" class="texera-dashboard-saved-workflow-search-box-input">
       <input
-      [(ngModel)]="workflowSearchValue"
-      autocomplete="on"
-      nz-input
-      placeholder="Search Workflows... Use a semicolon(;) between names"
-      (ngModelChange)="searchInputOnChange($event)"
-      type="text"
-      (keyup.enter)="searchWorkflow()"
-      [nzAutocomplete]="auto"
-    />
-    <nz-autocomplete [nzDataSource]="workflowSearchCriteria === 'workflows' ? filteredDashboardWorkflowNames : filteredDashboardWorkflowOwnerNames" nzBackfill #auto></nz-autocomplete>
-    </nz-input-group>
-      <ng-template #addOnBeforeTemplate>
-        <nz-select [(ngModel)]="workflowSearchCriteria">
-          <nz-option nzLabel="Workflow Name(s)" nzValue="workflows"></nz-option>
-          <nz-option nzLabel="Owner Name(s)" nzValue="owners"></nz-option>
-        </nz-select>
+        [(ngModel)]="workflowSearchValue"
+        autocomplete="on"
+        nz-input
+        placeholder='id:1 owner:ownerName "workflowName" access:read'
+        (ngModelChange)="searchInputOnChange($event)"
+        type="text"
+        [nzAutocomplete]="auto"
+        (keyup.enter)="searchWorkflow()"
+      />
+      <ng-template #suffixIconSearch>
+        <i nz-icon nzType="search"></i>
       </ng-template>
+      <nz-autocomplete
+        [nzDefaultActiveFirstOption]="false"
+        [nzDataSource]="!workflowSearchValue.includes(':') ? filteredDashboardWorkflowNames : []"
+        nzBackfill
+        #auto
+      ></nz-autocomplete>
+    </nz-input-group>
     <nz-list>
       <nz-list-item
         *ngFor="let dashboardWorkflowEntry of dashboardWorkflowEntries;let indexOfElement=index"

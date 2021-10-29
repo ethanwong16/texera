@@ -78,7 +78,7 @@ class WorkflowWebsocketResource extends LazyLogging {
 
   }
 
-  def handleRequestWithWorkflowState(
+  def handleRequestWithoutWorkflowState(
       request: TexeraWebSocketRequest,
       session: Session,
       uIdOpt: Option[UInteger]
@@ -105,7 +105,7 @@ class WorkflowWebsocketResource extends LazyLogging {
     }
   }
 
-  def handleRequestWithoutWorkflowState(
+  def handleRequestWithWorkflowState(
       request: TexeraWebSocketRequest,
       session: Session,
       uIdOpt: Option[UInteger]

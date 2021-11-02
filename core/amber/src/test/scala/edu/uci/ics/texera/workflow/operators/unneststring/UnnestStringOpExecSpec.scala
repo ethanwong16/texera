@@ -1,4 +1,4 @@
-package edu.uci.ics.texera.workflow.operators.split
+package edu.uci.ics.texera.workflow.operators.unneststring
 
 import edu.uci.ics.texera.workflow.common.tuple.Tuple
 import edu.uci.ics.texera.workflow.common.tuple.schema.{Attribute, AttributeType, Schema}
@@ -6,7 +6,7 @@ import org.scalatest.BeforeAndAfter
 import org.scalatest.flatspec.AnyFlatSpec
 import edu.uci.ics.texera.workflow.common.tuple.schema.OperatorSchemaInfo
 
-class SplitOpExecSpec extends AnyFlatSpec with BeforeAndAfter{
+class UnnestStringOpExecSpec extends AnyFlatSpec with BeforeAndAfter {
   val tupleSchema: Schema = Schema
     .newBuilder()
     .add(new Attribute("field1", AttributeType.STRING))
@@ -21,21 +21,23 @@ class SplitOpExecSpec extends AnyFlatSpec with BeforeAndAfter{
     .add(new Attribute("field3", AttributeType.STRING), "a")
     .build()
 
-  var opExec: SplitOpExec = _
-  var opDesc: SplitOpDesc = _
+  var opExec: UnnestStringOpExec = _
+  var opDesc: UnnestStringOpDesc = _
 
   before {
-    opDesc = new SplitOpDesc()
+    opDesc = new UnnestStringOpDesc()
     opDesc.attribute = "field1"
     opDesc.delimiter = "-"
     opDesc.resultAttribute = "split"
-    val outputSchema : Schema = opDesc.getOutputSchema(Array(tupleSchema))
-    val operatorSchemaInfo: OperatorSchemaInfo = OperatorSchemaInfo(Array(tupleSchema), outputSchema)
-    opExec = new SplitOpExec(opDesc, operatorSchemaInfo)
+    val outputSchema: Schema = opDesc.getOutputSchema(Array(tupleSchema))
+    val operatorSchemaInfo: OperatorSchemaInfo =
+      OperatorSchemaInfo(Array(tupleSchema), outputSchema)
+    opExec = new UnnestStringOpExec(opDesc, operatorSchemaInfo)
   }
 
   it should "open" in {
     opExec.open()
+    assert(opExec.flatMapFunc != null)
   }
 
   it should "split value in the given attribute and output the split result in the result attribute, one for each tuple" in {

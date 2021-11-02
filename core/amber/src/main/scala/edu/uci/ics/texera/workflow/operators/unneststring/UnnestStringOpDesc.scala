@@ -1,39 +1,47 @@
-package edu.uci.ics.texera.workflow.operators.split
+package edu.uci.ics.texera.workflow.operators.unneststring
 
 import com.fasterxml.jackson.annotation.{JsonProperty, JsonPropertyDescription}
 import com.google.common.base.Preconditions
-import edu.uci.ics.texera.workflow.common.metadata.{InputPort, OperatorGroupConstants, OperatorInfo, OutputPort}
+import edu.uci.ics.texera.workflow.common.metadata.{
+  InputPort,
+  OperatorGroupConstants,
+  OperatorInfo,
+  OutputPort
+}
 import edu.uci.ics.texera.workflow.common.metadata.annotations.AutofillAttributeName
 import edu.uci.ics.texera.workflow.common.operators.OneToOneOpExecConfig
 import edu.uci.ics.texera.workflow.common.operators.flatmap.FlatMapOpDesc
 import edu.uci.ics.texera.workflow.common.tuple.schema.{AttributeType, OperatorSchemaInfo, Schema}
 
-class SplitOpDesc extends FlatMapOpDesc {
-  @JsonProperty(value = "delimiter", required = true)
+class UnnestStringOpDesc extends FlatMapOpDesc {
+  @JsonProperty(value = "delimiter", required = true, defaultValue = ",")
   @JsonPropertyDescription("string that separates the data")
   var delimiter: String = _
 
   @JsonProperty(value = "attribute", required = true)
-  @JsonPropertyDescription("column to split")
+  @JsonPropertyDescription("column of the string to unnest")
   @AutofillAttributeName
   var attribute: String = _
 
-  @JsonProperty(value="result attribute", required = true, defaultValue = "split")
-  @JsonPropertyDescription("column name of the split result")
+  @JsonProperty(value = "result attribute", required = true, defaultValue = "unnestResult")
+  @JsonPropertyDescription("column name of the unnest result")
   var resultAttribute: String = _
 
   override def operatorInfo: OperatorInfo =
     OperatorInfo(
-      userFriendlyName = "Split",
+      userFriendlyName = "Unnest String",
       operatorDescription =
-        "Split values in the column separated by a delimiter to multiple values",
+        "Unnest the string values in the column separated by a delimiter to multiple values",
       operatorGroupName = OperatorGroupConstants.UTILITY_GROUP,
       inputPorts = List(InputPort()),
       outputPorts = List(OutputPort())
     )
 
   override def operatorExecutor(operatorSchemaInfo: OperatorSchemaInfo): OneToOneOpExecConfig = {
-    new OneToOneOpExecConfig(operatorIdentifier, _ => new SplitOpExec(this, operatorSchemaInfo))
+    new OneToOneOpExecConfig(
+      operatorIdentifier,
+      _ => new UnnestStringOpExec(this, operatorSchemaInfo)
+    )
   }
 
   override def getOutputSchema(schemas: Array[Schema]): Schema = {

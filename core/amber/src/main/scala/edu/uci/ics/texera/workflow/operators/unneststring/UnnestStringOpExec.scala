@@ -1,17 +1,21 @@
-package edu.uci.ics.texera.workflow.operators.split
+package edu.uci.ics.texera.workflow.operators.unneststring
 
 import edu.uci.ics.texera.workflow.common.operators.flatmap.FlatMapOpExec
 import edu.uci.ics.texera.workflow.common.tuple.Tuple
-import edu.uci.ics.texera.workflow.common.tuple.schema.{Attribute, AttributeType, OperatorSchemaInfo}
+import edu.uci.ics.texera.workflow.common.tuple.schema.{
+  Attribute,
+  AttributeType,
+  OperatorSchemaInfo
+}
 
-class SplitOpExec(opDesc: SplitOpDesc, operatorSchemaInfo: OperatorSchemaInfo)
+class UnnestStringOpExec(opDesc: UnnestStringOpDesc, operatorSchemaInfo: OperatorSchemaInfo)
     extends FlatMapOpExec {
 
   def splitByDelimiter(tuple: Tuple): Iterator[Tuple] = {
 
     val tupleValue = tuple.getField(this.opDesc.attribute).toString
-    val splitData = tupleValue.split(this.opDesc.delimiter)
-    val dataIterator = splitData.filter(!_.equals("")).toIterator
+    val unnestData = tupleValue.split(this.opDesc.delimiter)
+    val dataIterator = unnestData.filter(!_.equals("")).toIterator
 
     dataIterator.map(split => {
       Tuple

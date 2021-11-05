@@ -5,11 +5,14 @@ package edu.uci.ics.texera.web.model.jooq.generated;
 
 
 import edu.uci.ics.texera.web.model.jooq.generated.tables.File;
+import edu.uci.ics.texera.web.model.jooq.generated.tables.FileOfProject;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.KeywordDictionary;
+import edu.uci.ics.texera.web.model.jooq.generated.tables.Project;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.User;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.UserDictionary;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.UserFileAccess;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.Workflow;
+import edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowOfProject;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowOfUser;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowUserAccess;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowVersion;
@@ -29,7 +32,7 @@ import org.jooq.impl.SchemaImpl;
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
 public class TexeraDb extends SchemaImpl {
 
-    private static final long serialVersionUID = 956293362;
+    private static final long serialVersionUID = 1741177343;
 
     /**
      * The reference instance of <code>texera_db</code>
@@ -42,9 +45,19 @@ public class TexeraDb extends SchemaImpl {
     public final File FILE = edu.uci.ics.texera.web.model.jooq.generated.tables.File.FILE;
 
     /**
+     * The table <code>texera_db.file_of_project</code>.
+     */
+    public final FileOfProject FILE_OF_PROJECT = edu.uci.ics.texera.web.model.jooq.generated.tables.FileOfProject.FILE_OF_PROJECT;
+
+    /**
      * The table <code>texera_db.keyword_dictionary</code>.
      */
     public final KeywordDictionary KEYWORD_DICTIONARY = edu.uci.ics.texera.web.model.jooq.generated.tables.KeywordDictionary.KEYWORD_DICTIONARY;
+
+    /**
+     * The table <code>texera_db.project</code>.
+     */
+    public final Project PROJECT = edu.uci.ics.texera.web.model.jooq.generated.tables.Project.PROJECT;
 
     /**
      * The table <code>texera_db.user</code>.
@@ -65,6 +78,11 @@ public class TexeraDb extends SchemaImpl {
      * The table <code>texera_db.workflow</code>.
      */
     public final Workflow WORKFLOW = edu.uci.ics.texera.web.model.jooq.generated.tables.Workflow.WORKFLOW;
+
+    /**
+     * The table <code>texera_db.workflow_of_project</code>.
+     */
+    public final WorkflowOfProject WORKFLOW_OF_PROJECT = edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowOfProject.WORKFLOW_OF_PROJECT;
 
     /**
      * The table <code>texera_db.workflow_of_user</code>.
@@ -104,11 +122,14 @@ public class TexeraDb extends SchemaImpl {
     private final List<Table<?>> getTables0() {
         return Arrays.<Table<?>>asList(
             File.FILE,
+            FileOfProject.FILE_OF_PROJECT,
             KeywordDictionary.KEYWORD_DICTIONARY,
+            Project.PROJECT,
             User.USER,
             UserDictionary.USER_DICTIONARY,
             UserFileAccess.USER_FILE_ACCESS,
             Workflow.WORKFLOW,
+            WorkflowOfProject.WORKFLOW_OF_PROJECT,
             WorkflowOfUser.WORKFLOW_OF_USER,
             WorkflowUserAccess.WORKFLOW_USER_ACCESS,
             WorkflowVersion.WORKFLOW_VERSION);

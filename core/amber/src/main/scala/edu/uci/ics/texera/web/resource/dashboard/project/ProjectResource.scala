@@ -92,27 +92,34 @@ class ProjectResource {
     */
   @GET
   @Path("/workflows/{pid}/{uid}")
-  def listProjectWorkflows(@PathParam("pid") pid: UInteger, @PathParam("uid") uid: UInteger): util.List[DashboardWorkflowEntry] = {
+  def listProjectWorkflows(
+      @PathParam("pid") pid: UInteger,
+      @PathParam("uid") uid: UInteger
+  ): util.List[DashboardWorkflowEntry] = {
     val workflowMappings = workflowOfProjectDao.fetchByPid(pid)
     val workflows: mutable.ArrayBuffer[DashboardWorkflowEntry] = mutable.ArrayBuffer()
 
     workflowMappings.asScala.toList.map(workflowMap => {
       val workflowID = workflowMap.getWid
-      val ownerList = workflowOfUserDao.fetchByWid(workflowID) // should only have one owner per workflow, but just in case
-      val ownerName = if (ownerList.size() > 0) userDao.fetchOneByUid(ownerList.get(0).getUid).getName else "None"
+      val ownerList =
+        workflowOfUserDao.fetchByWid(
+          workflowID
+        ) // should only have one owner per workflow, but just in case
+      val ownerName =
+        if (ownerList.size() > 0) userDao.fetchOneByUid(ownerList.get(0).getUid).getName else "None"
 
       workflows += DashboardWorkflowEntry(
-        workflowOfUserDao.existsById(context.newRecord(WORKFLOW_OF_USER.UID, WORKFLOW_OF_USER.WID).values(uid, workflowID)),
+        workflowOfUserDao.existsById(
+          context.newRecord(WORKFLOW_OF_USER.UID, WORKFLOW_OF_USER.WID).values(uid, workflowID)
+        ),
         checkAccessLevel(workflowID, uid).toString,
         ownerName,
         workflowDao.fetchOneByWid(workflowID)
       )
-      }
-    )
+    })
 
     workflows.toList.asJava
   }
-
 
   /**
     * This method returns a list of DashboardFileEntry objects, which represents
@@ -127,7 +134,10 @@ class ProjectResource {
     */
   @GET
   @Path("/files/{pid}/{uid}")
-  def listProjectFiles(@PathParam("pid") pid: UInteger, @PathParam("uid") uid: UInteger): util.List[DashboardFileEntry] = {
+  def listProjectFiles(
+      @PathParam("pid") pid: UInteger,
+      @PathParam("uid") uid: UInteger
+  ): util.List[DashboardFileEntry] = {
     val fileMappings = fileOfProjectDao.fetchByPid(pid)
     val files: mutable.ArrayBuffer[DashboardFileEntry] = mutable.ArrayBuffer()
 
@@ -135,12 +145,13 @@ class ProjectResource {
       val fileID = fileMap.getFid
       val fileObject = fileDao.fetchOneByFid(fileID)
       val ownerName = userDao.fetchOneByUid(fileObject.getUid).getName
-      val access = userFileAccessDao.findById(context.newRecord(USER_FILE_ACCESS.UID, USER_FILE_ACCESS.FID).values(uid, fileID))
+      val access = userFileAccessDao.findById(
+        context.newRecord(USER_FILE_ACCESS.UID, USER_FILE_ACCESS.FID).values(uid, fileID)
+      )
       var accessLevel = "None"
       if (access != null && access.getWriteAccess) {
         accessLevel = "Write"
-      }
-      else if (access != null && access.getReadAccess) {
+      } else if (access != null && access.getReadAccess) {
         accessLevel = "Read"
       }
 
@@ -228,8 +239,13 @@ class ProjectResource {
     */
   @DELETE
   @Path("/deleteWorkflow/{pid}/{wid}")
-  def deleteWorkflowFromProject(@PathParam("pid") pid: UInteger, @PathParam("wid") wid: UInteger): Unit = {
-    workflowOfProjectDao.deleteById(context.newRecord(WORKFLOW_OF_PROJECT.WID, WORKFLOW_OF_PROJECT.PID).values(wid, pid))
+  def deleteWorkflowFromProject(
+      @PathParam("pid") pid: UInteger,
+      @PathParam("wid") wid: UInteger
+  ): Unit = {
+    workflowOfProjectDao.deleteById(
+      context.newRecord(WORKFLOW_OF_PROJECT.WID, WORKFLOW_OF_PROJECT.PID).values(wid, pid)
+    )
   }
 
   /**
@@ -241,8 +257,13 @@ class ProjectResource {
     */
   @DELETE
   @Path("/deleteFile/{pid}/{fid}")
-  def deleteFileFromProject(@PathParam("pid") pid: UInteger, @PathParam("fid") fid: UInteger): Unit = {
-    fileOfProjectDao.deleteById(context.newRecord(FILE_OF_PROJECT.FID, FILE_OF_PROJECT.PID).values(fid, pid))
+  def deleteFileFromProject(
+      @PathParam("pid") pid: UInteger,
+      @PathParam("fid") fid: UInteger
+  ): Unit = {
+    fileOfProjectDao.deleteById(
+      context.newRecord(FILE_OF_PROJECT.FID, FILE_OF_PROJECT.PID).values(fid, pid)
+    )
   }
 
 }

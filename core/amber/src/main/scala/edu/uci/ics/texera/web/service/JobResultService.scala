@@ -33,7 +33,7 @@ object JobResultService {
 
   val defaultPageSize: Int = 10
 
-  scal // convert Tuple from engine's format to JSON format
+  // convert Tuple from engine's format to JSON format
   def webDataFromTuple(
       mode: WebOutputMode,
       table: List[ITuple],

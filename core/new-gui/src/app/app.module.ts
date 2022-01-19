@@ -103,6 +103,12 @@ import { VersionsListDisplayComponent } from "./workspace/component/property-edi
 import { NzPaginationModule } from "ng-zorro-antd/pagination";
 import { JwtModule } from "@auth0/angular-jwt";
 import { AuthService } from "./common/service/user/auth.service";
+import { UserProjectSectionComponent } from './dashboard/component/feature-container/user-project-section/user-project-section.component';
+import { ProjectPageComponent } from './dashboard/component/feature-container/user-project-section/project-page/project-page.component';
+import { NgbdModalAddProjectWorkflowComponent } from './dashboard/component/feature-container/user-project-section/project-page/ngbd-modal-add-project-workflow/ngbd-modal-add-project-workflow.component';
+import { NgbdModalRemoveProjectWorkflowComponent } from './dashboard/component/feature-container/user-project-section/project-page/ngbd-modal-remove-project-workflow/ngbd-modal-remove-project-workflow.component';
+import { NgbdModalAddProjectFileComponent } from './dashboard/component/feature-container/user-project-section/project-page/ngbd-modal-add-project-file/ngbd-modal-add-project-file.component';
+import { NgbdModalRemoveProjectFileComponent } from './dashboard/component/feature-container/user-project-section/project-page/ngbd-modal-remove-project-file/ngbd-modal-remove-project-file.component';
 
 registerLocaleData(en);
 
@@ -159,6 +165,12 @@ registerLocaleData(en);
     OperatorPropertyEditFrameComponent,
     BreakpointPropertyEditFrameComponent,
     DebuggerFrameComponent,
+    UserProjectSectionComponent,
+    ProjectPageComponent,
+    NgbdModalAddProjectWorkflowComponent,
+    NgbdModalRemoveProjectWorkflowComponent,
+    NgbdModalAddProjectFileComponent,
+    NgbdModalRemoveProjectFileComponent,
   ],
   imports: [
     BrowserModule,
@@ -224,6 +236,10 @@ registerLocaleData(en);
     NzPaginationModule,
   ],
   entryComponents: [
+    NgbdModalAddProjectWorkflowComponent,
+    NgbdModalRemoveProjectWorkflowComponent,
+    NgbdModalAddProjectFileComponent,
+    NgbdModalRemoveProjectFileComponent,
     NgbdModalAddWorkflowComponent,
     NgbdModalDeleteWorkflowComponent,
     NgbdModalResourceViewComponent,

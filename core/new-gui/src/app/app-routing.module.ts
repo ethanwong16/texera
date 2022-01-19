@@ -6,6 +6,9 @@ import { DashboardComponent } from "./dashboard/component/dashboard.component";
 import { SavedWorkflowSectionComponent } from "./dashboard/component/feature-container/saved-workflow-section/saved-workflow-section.component";
 import { UserDictionarySectionComponent } from "./dashboard/component/feature-container/user-dictionary-section/user-dictionary-section.component";
 import { UserFileSectionComponent } from "./dashboard/component/feature-container/user-file-section/user-file-section.component";
+import { ProjectPageComponent } from "./dashboard/component/feature-container/user-project-section/project-page/project-page.component";
+import { UserProjectSectionComponent } from "./dashboard/component/feature-container/user-project-section/user-project-section.component";
+
 
 import { WorkspaceComponent } from "./workspace/component/workspace.component";
 
@@ -36,6 +39,14 @@ if (environment.userSystemEnabled) {
     path: "dashboard",
     component: DashboardComponent,
     children: [
+      {
+        path: "project",
+        component: UserProjectSectionComponent,
+      },
+      {
+        path: "project/:pid",
+        component: ProjectPageComponent,
+      },
       {
         path: "workflow",
         component: SavedWorkflowSectionComponent,

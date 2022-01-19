@@ -147,48 +147,6 @@ class ProjectResource {
     workflows.toList.asJava
   }
 
-//  /**
-//    * This method returns a list of DashboardWorkflowEntry objects, which represents
-//    * all the workflows that are inside the specified project.
-//    *
-//    * Note : since user authentication is not enabled, it temporarily takes in a
-//    * user ID
-//    *
-//    * @param pid project ID
-//    * @param uid user ID (in place of authentication)
-//    * @return list of DashboardWorkflowEntry objects
-//    */
-//  @GET
-//  @Path("/workflows/{pid}/{uid}")
-//  def listProjectWorkflows(
-//      @PathParam("pid") pid: UInteger,
-//      @PathParam("uid") uid: UInteger
-//  ): util.List[DashboardWorkflowEntry] = {
-//    val workflowMappings = workflowOfProjectDao.fetchByPid(pid)
-//    val workflows: mutable.ArrayBuffer[DashboardWorkflowEntry] = mutable.ArrayBuffer()
-//
-//    workflowMappings.asScala.toList.map(workflowMap => {
-//      val workflowID = workflowMap.getWid
-//      val ownerList =
-//        workflowOfUserDao.fetchByWid(
-//          workflowID
-//        ) // should only have one owner per workflow, but just in case
-//      val ownerName =
-//        if (ownerList.size() > 0) userDao.fetchOneByUid(ownerList.get(0).getUid).getName else "None"
-//
-//      workflows += DashboardWorkflowEntry(
-//        workflowOfUserDao.existsById(
-//          context.newRecord(WORKFLOW_OF_USER.UID, WORKFLOW_OF_USER.WID).values(uid, workflowID)
-//        ),
-//        checkAccessLevel(workflowID, uid).toString,
-//        ownerName,
-//        workflowDao.fetchOneByWid(workflowID)
-//      )
-//    })
-//
-//    workflows.toList.asJava
-//  }
-
   /**
     * This method returns a list of DashboardFileEntry objects, which represents
     * all the file objects that are part of the specified project.

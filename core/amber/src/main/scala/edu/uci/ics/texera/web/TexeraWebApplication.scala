@@ -4,7 +4,7 @@ import akka.actor.{ActorSystem, Cancellable}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.github.dirkraft.dropwizard.fileassets.FileAssetsBundle
 import com.github.toastshaman.dropwizard.auth.jwt.JwtAuthFilter
-import edu.uci.ics.amber.engine.common.{AmberClient, AmberUtils}
+import edu.uci.ics.amber.engine.common.AmberUtils
 import edu.uci.ics.texera.Utils
 import edu.uci.ics.texera.web.auth.JwtAuth.jwtConsumer
 import edu.uci.ics.texera.web.auth.{SessionUser, UserAuthenticator, UserRoleAuthorizer}
@@ -16,7 +16,7 @@ import edu.uci.ics.texera.web.resource.dashboard.workflow.{
   WorkflowVersionResource
 }
 import edu.uci.ics.texera.web.resource.dashboard.project.ProjectResource
-import edu.uci.ics.texera.web.resource.{UserDictionaryResource, _}
+import edu.uci.ics.texera.web.resource.{UserConfigResource, _}
 import io.dropwizard.auth.{AuthDynamicFeature, AuthValueFactoryProvider}
 import io.dropwizard.setup.{Bootstrap, Environment}
 import io.dropwizard.websockets.WebsocketBundle
@@ -30,6 +30,8 @@ import edu.uci.ics.amber.engine.architecture.controller.{ControllerConfig, Workf
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
 import java.time.Duration
+
+import edu.uci.ics.amber.engine.common.client.AmberClient
 
 object TexeraWebApplication {
 
@@ -67,6 +69,7 @@ class TexeraWebApplication extends io.dropwizard.Application[TexeraWebConfigurat
     bootstrap.addBundle(new FileAssetsBundle("../new-gui/dist", "/", "index.html"))
     // add websocket bundle
     bootstrap.addBundle(new WebsocketBundle(classOf[WorkflowWebsocketResource]))
+    bootstrap.addBundle(new WebsocketBundle(classOf[CollaborationResource]))
     // register scala module to dropwizard default object mapper
     bootstrap.getObjectMapper.registerModule(DefaultScalaModule)
   }
@@ -117,7 +120,7 @@ class TexeraWebApplication extends io.dropwizard.Application[TexeraWebConfigurat
     environment.jersey.register(classOf[SchemaPropagationResource])
     environment.jersey.register(classOf[AuthResource])
     environment.jersey.register(classOf[GoogleAuthResource])
-    environment.jersey.register(classOf[UserDictionaryResource])
+    environment.jersey.register(classOf[UserConfigResource])
     environment.jersey.register(classOf[UserFileAccessResource])
     environment.jersey.register(classOf[UserFileResource])
     environment.jersey.register(classOf[WorkflowAccessResource])

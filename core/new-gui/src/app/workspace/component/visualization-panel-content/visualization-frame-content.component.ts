@@ -1,4 +1,4 @@
-import { AfterContentInit, Component, Input, OnDestroy } from "@angular/core";
+import { AfterContentInit, Component, Input, OnDestroy, OnInit } from "@angular/core";
 import * as c3 from "c3";
 import { Primitive, PrimitiveArray } from "c3";
 import * as d3 from "d3";
@@ -35,7 +35,7 @@ type WordCloudControlsType = {
   templateUrl: "./visualization-frame-content.component.html",
   styleUrls: ["./visualization-frame-content.component.scss"],
 })
-export class VisualizationFrameContentComponent implements AfterContentInit, OnDestroy {
+export class VisualizationFrameContentComponent implements OnInit, AfterContentInit, OnDestroy {
   // this readonly variable must be the same as HTML element ID for visualization
   public static readonly CHART_ID = "#texera-result-chart-content";
   public static readonly MAP_CONTAINER = "texera-result-map-container";
@@ -76,12 +76,22 @@ export class VisualizationFrameContentComponent implements AfterContentInit, OnD
   data?: ReadonlyArray<object>;
   chartType?: ChartType;
   columns: string[] = [];
+  /* Mapbox doesn't allow drawing points on the map if the style is not rendered,
+   * hence we keep a flag to check if the style is loaded */
+  isMapStyleRendered: boolean = false;
 
   private wordCloudElement?: d3.Selection<SVGGElement, unknown, HTMLElement, any>;
   private c3ChartElement?: c3.ChartAPI;
   private map?: mapboxgl.Map;
 
   constructor(private workflowResultService: WorkflowResultService, private sanitizer: DomSanitizer) {}
+
+  ngOnInit() {
+    this.initMap();
+    this.map?.on("styledata", () => {
+      this.isMapStyleRendered = true;
+    });
+  }
 
   ngAfterContentInit() {
     // attempt to draw chart immediately
@@ -199,16 +209,15 @@ export class VisualizationFrameContentComponent implements AfterContentInit, OnD
       bindto: VisualizationFrameContentComponent.CHART_ID,
     });
   }
-
   generateSpatialScatterPlot() {
-    if (this.map === undefined) {
-      this.initMap();
-    }
-    /* after the map is defined and the base
-    style is loaded, we add a layer of the data points */
-    this.map?.on("styledata", () => {
+    /* after the map style is loaded, we add a layer of the data points */
+    if (!this.isMapStyleRendered) {
+      this.map?.on("styledata", () => {
+        this.addNewOrReplaceExistingLayer();
+      });
+    } else {
       this.addNewOrReplaceExistingLayer();
-    });
+    }
   }
 
   initMap() {
@@ -353,20 +362,24 @@ export class VisualizationFrameContentComponent implements AfterContentInit, OnD
 
     const dataToDisplay: Array<[string, ...PrimitiveArray]> = [];
     const category: string[] = [];
-    for (let i = 1; i < this.columns?.length; i++) {
-      category.push(this.columns[i]);
+
+    const result = this.data as Array<Record<string, Primitive>>;
+
+    // category for x-axis
+    for (let i = 1; i < Object.values(result[0]).length; i++) {
+      category.push(String(Object.keys(result[0])[i]));
     }
+    const columnCount = category.length;
 
-    const columnCount = this.columns.length;
-
-    for (const row of this.data) {
-      const items: [string, ...PrimitiveArray] = [Object.values(row)[0]];
-      for (let i = 1; i < columnCount; i++) {
+    // data
+    for (const row of result) {
+      var items: [string, ...PrimitiveArray] = [String(Object.values(row)[0])];
+      for (let i = 1; i < columnCount + 1; i++) {
         items.push(Number(Object.values(row)[i]));
       }
       dataToDisplay.push(items);
     }
-
+    // generate chart
     if (this.c3ChartElement) {
       this.c3ChartElement.destroy();
     }

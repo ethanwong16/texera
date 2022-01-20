@@ -9,7 +9,7 @@ import edu.uci.ics.texera.web.model.jooq.generated.tables.FileOfProject;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.KeywordDictionary;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.Project;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.User;
-import edu.uci.ics.texera.web.model.jooq.generated.tables.UserDictionary;
+import edu.uci.ics.texera.web.model.jooq.generated.tables.UserConfig;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.UserFileAccess;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.Workflow;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowOfProject;
@@ -32,7 +32,7 @@ import org.jooq.impl.SchemaImpl;
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
 public class TexeraDb extends SchemaImpl {
 
-    private static final long serialVersionUID = 1741177343;
+    private static final long serialVersionUID = -1924717038;
 
     /**
      * The reference instance of <code>texera_db</code>
@@ -65,9 +65,9 @@ public class TexeraDb extends SchemaImpl {
     public final User USER = edu.uci.ics.texera.web.model.jooq.generated.tables.User.USER;
 
     /**
-     * The table <code>texera_db.user_dictionary</code>.
+     * The table <code>texera_db.user_config</code>.
      */
-    public final UserDictionary USER_DICTIONARY = edu.uci.ics.texera.web.model.jooq.generated.tables.UserDictionary.USER_DICTIONARY;
+    public final UserConfig USER_CONFIG = edu.uci.ics.texera.web.model.jooq.generated.tables.UserConfig.USER_CONFIG;
 
     /**
      * The table <code>texera_db.user_file_access</code>.
@@ -126,7 +126,7 @@ public class TexeraDb extends SchemaImpl {
             KeywordDictionary.KEYWORD_DICTIONARY,
             Project.PROJECT,
             User.USER,
-            UserDictionary.USER_DICTIONARY,
+            UserConfig.USER_CONFIG,
             UserFileAccess.USER_FILE_ACCESS,
             Workflow.WORKFLOW,
             WorkflowOfProject.WORKFLOW_OF_PROJECT,

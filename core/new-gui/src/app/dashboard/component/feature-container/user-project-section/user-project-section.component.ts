@@ -36,7 +36,7 @@ export class UserProjectSectionComponent implements OnInit {
       .retrieveProjectList()
       .pipe(untilDestroyed(this))
       .subscribe(projectEntries => {
-        this.projectEntries = projectEntries
+        this.projectEntries = projectEntries;
       });
   }
 

@@ -51,7 +51,7 @@ export class UserProjectService {
     this.retrieveFilesOfProject(pid)
       .subscribe(files => {
         this.files = files;
-      })
+      });
   }
 
   public retrieveProject(pid: number) : Observable<Project>{
@@ -71,7 +71,7 @@ export class UserProjectService {
   }
 
   public addWorkflowToProject(pid: number, wid: number): Observable<Response>{
-    return this.http.post<Response>(`${ADD_WORKFLOW_TO_PROJECT_URL}/` + pid + "/" + wid, {})
+    return this.http.post<Response>(`${ADD_WORKFLOW_TO_PROJECT_URL}/` + pid + "/" + wid, {});
   }
 
   public removeWorkflowFromProject(pid: number, wid: number): Observable<Response>{

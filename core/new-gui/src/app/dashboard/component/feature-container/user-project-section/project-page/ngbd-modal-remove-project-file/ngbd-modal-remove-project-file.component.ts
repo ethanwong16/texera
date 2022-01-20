@@ -4,6 +4,7 @@ import { Observable, forkJoin } from 'rxjs';
 import { UserProjectService } from '../../../../../service/user-project/user-project.service';
 import { DashboardUserFileEntry } from '../../../../../type/dashboard-user-file-entry';
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
+import { UserFileService } from '../../../../../service/user-file/user-file.service';
 
 @UntilDestroy()
 @Component({
@@ -12,14 +13,16 @@ import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
   styleUrls: ['./ngbd-modal-remove-project-file.component.scss']
 })
 export class NgbdModalRemoveProjectFileComponent implements OnInit {
-  @Input() addedFiles!: DashboardUserFileEntry[];
+  // @Input() addedFiles!: DashboardUserFileEntry[];
+  @Input() addedFiles!: ReadonlyArray<DashboardUserFileEntry>;
   @Input() projectId!: number;
 
   public checkedFiles: boolean[] = [];
 
   constructor(
     public activeModal: NgbActiveModal,
-    private userProjectService: UserProjectService
+    private userProjectService: UserProjectService,
+    private userFileService: UserFileService
   ) { }
 
   ngOnInit(): void {
@@ -32,14 +35,14 @@ export class NgbdModalRemoveProjectFileComponent implements OnInit {
     for (let index = this.checkedFiles.length - 1; index >= 0; --index) {
       if (this.checkedFiles[index]) {
         observables.push(this.userProjectService.removeFileFromProject(this.projectId, this.addedFiles[index].file.fid!));
-        this.addedFiles.splice(index, 1); // for updating frontend cache
       }
     }
 
     forkJoin(observables)
        .pipe(untilDestroyed(this))
-       .subscribe(response => {
-         this.activeModal.close(this.addedFiles);
+       .subscribe(() => {
+         this.userProjectService.refreshFilesOfProject(this.projectId);
+         this.activeModal.close();
         })
   }
 
@@ -53,6 +56,10 @@ export class NgbdModalRemoveProjectFileComponent implements OnInit {
     } else {
       this.checkedFiles.fill(true);
     }
+  }
+
+  public addFileSizeUnit(fileSize: number): string {
+    return this.userFileService.addFileSizeUnit(fileSize);
   }
 
 }

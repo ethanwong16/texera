@@ -1,10 +1,9 @@
 import { Component, OnInit } from '@angular/core';
-import { DashboardWorkflowEntry } from 'src/app/dashboard/type/dashboard-workflow-entry';
 import { UserProjectService } from '../../../service/user-project/user-project.service';
 import { Project } from '../../../type/project';
 import { Router } from '@angular/router';
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
-import { NotificationService } from "src/app/common/service/notification/notification.service"
+import { NzMessageService } from 'ng-zorro-antd/message';
 
 export const ROUTER_PROJECT_BASE_URL = "/dashboard/project";
 
@@ -20,13 +19,10 @@ export class UserProjectSectionComponent implements OnInit {
   public createButtonIsClicked: boolean = false;
   public createProjectName: string = "";
 
-  // temporary just to visualize, thinking of creating separate components for workflows/files?
-  public projectWorkflows: Map<number, DashboardWorkflowEntry[]> = new Map();
-
   constructor(
     private userProjectService: UserProjectService,
-    private notificationService: NotificationService,
-    private router: Router
+    private router: Router,
+    private message: NzMessageService
   ) { 
   }
 
@@ -34,54 +30,20 @@ export class UserProjectSectionComponent implements OnInit {
     this.getProjectArray();
   }
 
-  // public getProjectArray(): ReadonlyArray<Project> {
-  //   const projectArray = this.userProjectService.getProjectList();
-  //   if (!projectArray) {
-  //     return [];
-  //   }
-  //   // console.log("lookie here");
-  //   // console.log(projectArray);
-  //   // this.projectEntries = projectArray;
-  //   return projectArray;
-  // }
-
   private getProjectArray() {
-    // const projectArray = 
-
+    
     this.userProjectService
       .retrieveProjectList()
       .pipe(untilDestroyed(this))
       .subscribe(projectEntries => {
         this.projectEntries = projectEntries
-
-        // temporary
-        // for (let project of this.projectEntries) {
-        //   this.getWorkflowsOfProject(project.pid);
-        // }
       });
-
-    // if (projectArray) {
-    //   console.log("component: inside here");
-    //   this.projectEntries = projectArray;
-    // }
-    // console.log("lookie here");
-    // console.log(projectArray);
-    // this.projectEntries = projectArray;
-  }
-
-  private getWorkflowsOfProject(pid : number) {
-
-    this.userProjectService
-      .retrieveWorkflowsOfProject(pid)
-      .pipe(untilDestroyed(this))
-      .subscribe(workflows => (this.projectWorkflows.set(pid, workflows)));
   }
 
   /**
    * navigate to individual project page
    */
   public jumpToProject({ pid }: Project): void {
-    // console.log(pid);
     this.router.navigate([`${ROUTER_PROJECT_BASE_URL}/${pid}`]).then(null);
   }
 
@@ -89,25 +51,35 @@ export class UserProjectSectionComponent implements OnInit {
     this.projectEntriesIsEditingName = this.projectEntriesIsEditingName.filter(index => index != pid);
   }
 
-  public saveProjectName(project: Project, newName: string): void {
-    this.userProjectService
+  public saveProjectName(project: Project, newName: string, index: number): void {
+    // nothing happens if name is the same
+    if (project.name === newName) {
+      this.removeEditStatus(project.pid);
+    }
+
+    // checks the projects belonging to user to see if this will create duplicate name
+    else if (this.projectEntries.filter(p => project.pid !== p.pid && p.name === newName).length > 0) {
+      // show error message and don't call backend
+      this.message.create("error", `Project named: ${newName} already exists`)
+    }
+
+    else {
+      this.userProjectService
       .updateProjectName(project.pid, newName)
       .pipe(untilDestroyed(this))
-      .subscribe(response => {
-      this.removeEditStatus(project.pid);
-
-      // refresh, temporary could probably just do this locally later
-      this.getProjectArray();
+      .subscribe(() => {
+        this.removeEditStatus(project.pid);
+        this.getProjectArray(); // refresh list of projects, name is read only property so can't edit
     });
+    }
   }
 
-  public deleteProject(pid: number): void{
+  public deleteProject(pid: number, index: number): void{
     this.userProjectService
       .deleteProject(pid)
       .pipe(untilDestroyed(this))
-      .subscribe(response => {
-      // refresh, temporary could probably just do this locally later
-      this.getProjectArray();
+      .subscribe(() => {
+        this.projectEntries.splice(index, 1); // update local list of projects
     });
   }
 
@@ -121,11 +93,10 @@ export class UserProjectSectionComponent implements OnInit {
   }
 
   public createNewProject(): void{
-
     // checks the projects belonging to user to see if this will create duplicate name
     if (this.projectEntries.filter(project => project.name === this.createProjectName).length > 0) {
       // show error message and don't call backend
-      console.log("added duplicate");
+      this.message.create("error", `Project named: ${this.createProjectName} already exists`)
     }
 
     else {
@@ -133,10 +104,8 @@ export class UserProjectSectionComponent implements OnInit {
        .createProject(this.createProjectName)
        .pipe(untilDestroyed(this))
        .subscribe(
-         (response) => {
-          // refresh, temporary could probably just do this locally later
-          console.log(response);
-          this.getProjectArray();
+         (createdProject) => {
+          this.projectEntries.push(createdProject); // update local list of projects
           this.unclickCreateButton();
         }
       );

@@ -18,7 +18,6 @@ export class NgbdModalAddProjectWorkflowComponent implements OnInit {
 
   public unaddedWorkflows: DashboardWorkflowEntry[] = [];
   public checkedWorkflows: boolean[] = [];
-  // private checkedWorkflowIndices: Set<number> = new Set<number>();
   private addedWorkflowKeys: Set<number> = new Set<number>();
 
   constructor(
@@ -28,67 +27,9 @@ export class NgbdModalAddProjectWorkflowComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    //TODO : verify that it's ok to force cast to number, since wid may be undefined
-    this.addedWorkflows.forEach(workflowEntry => this.addedWorkflowKeys.add(workflowEntry.workflow.wid!));
+    this.addedWorkflows.forEach(workflowEntry => this.addedWorkflowKeys.add(workflowEntry.workflow.wid!)); // TODO : would force casting cause any issues?
     this.refreshProjectWorkflowEntries();
   }
-
-  // only closes modal when changes are finished on backend
-  /*
-  public submitForm() {
-    // data structure to track group of updates to make to backend
-    let observables: Observable<Response>[] = [];
-
-    // process checked marks, updating local cache then propagating to backend
-    // FIRST CHECK IF ALL CHECKBOXES ARE MARKED, THEN HAVE TO ITERATE THROUGH ENTIRE LIST
-    this.checkedWorkflowIndices.forEach(index => {
-      observables.push(this.userProjectService.addWorkflowToProject(this.projectId, this.unaddedWorkflows[index].workflow.wid!));
-      
-      // update local cache
-      this.addedWorkflows.push(this.unaddedWorkflows[index]);
-    });
-
-    // pass back data to update local cache after all changes propagated to backend
-    forkJoin(observables).subscribe(response => {
-      this.activeModal.close(this.addedWorkflows);
-    });
-  }*/
-
-  // asynchronous, may be faster but has issues
-  /*
-  public submitForm() {
-    
-    // process checked marks, updating local cache then propagating to backend
-    // FIRST CHECK IF ALL CHECKBOXES ARE MARKED, THEN HAVE TO ITERATE THROUGH ENTIRE LIST
-    this.checkedWorkflowIndices.forEach(index => {
-      this.userProjectService
-        .addWorkflowToProject(this.projectId, this.unaddedWorkflows[index].workflow.wid!)
-        .subscribe();
-      
-      // update local cache
-      this.addedWorkflows.push(this.unaddedWorkflows[index]);
-    });
-
-    // TODO : CHECK IF SHOULD BE ASYNCHRONOUS OR SYNCHRONOUS https://stackoverflow.com/questions/48185502/angular-how-to-await-subscribe/48185851
-    // https://ostack.cn/?qa=1053184/angular-how-to-wait-for-subscriptions-inside-a-for-loop-to-complete-before-proceeding
-
-    // pass back data to update local cache after all changes propagated to backend
-    this.activeModal.close(this.addedWorkflows);
-  } */
-
-  /*
-  public processCheck(index: number) {
-    // box is being unchecked
-    if (this.checkedWorkflowIndices.has(index)) {
-      this.checkedWorkflowIndices.delete(index);
-    } 
-    // box is being checked
-    else {
-      this.checkedWorkflowIndices.add(index);
-    }
-  } */
-
-  // ------------------------ USING ARRAY INSTEAD OF SET FOR CHECKBOXES
 
   public submitForm() {
     // data structure to track group of updates to make to backend
@@ -128,7 +69,6 @@ export class NgbdModalAddProjectWorkflowComponent implements OnInit {
       .pipe(untilDestroyed(this))
       .subscribe(dashboardWorkflowEntries => {
         this.unaddedWorkflows = dashboardWorkflowEntries.filter(workflowEntry => workflowEntry.workflow.wid !== undefined && !this.addedWorkflowKeys.has(workflowEntry.workflow.wid!));
-        
         this.checkedWorkflows = new Array(this.unaddedWorkflows.length).fill(false);
       });
   }

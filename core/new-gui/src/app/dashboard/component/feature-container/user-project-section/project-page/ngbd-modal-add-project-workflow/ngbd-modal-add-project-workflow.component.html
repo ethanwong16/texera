@@ -18,7 +18,6 @@
         </thead>
         <tbody>
             <tr *ngFor="let workflowEntry of unaddedWorkflows; let i = index">
-                <!-- <td><input type="checkbox" (change)="processCheck(i)"></td> --> 
                 <td><input type="checkbox" [(ngModel)]="checkedWorkflows[i]"></td>
                 <td>{{workflowEntry.workflow.wid}}</td>
                 <td>{{workflowEntry.workflow.name}}</td>

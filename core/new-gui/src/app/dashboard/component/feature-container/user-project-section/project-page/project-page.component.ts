@@ -9,7 +9,7 @@ import { NgbdModalAddProjectFileComponent } from './ngbd-modal-add-project-file/
 import { NgbdModalRemoveProjectFileComponent } from './ngbd-modal-remove-project-file/ngbd-modal-remove-project-file.component';
 import { DashboardWorkflowEntry } from 'src/app/dashboard/type/dashboard-workflow-entry';
 import { DashboardUserFileEntry } from 'src/app/dashboard/type/dashboard-user-file-entry';
-import { Project } from 'src/app/dashboard/type/project';
+import { concatMap, catchError } from 'rxjs/operators';
 
 // ---- for workflow card
 import { WorkflowPersistService } from '../../../../../common/service/workflow-persist/workflow-persist.service';
@@ -25,7 +25,7 @@ import { NgbdModalUserFileShareAccessComponent } from '../../user-file-section/n
 
 export const ROUTER_WORKFLOW_BASE_URL = "/workflow";
 
-@UntilDestroy() // -- for file / workflow card
+@UntilDestroy()
 @Component({
   selector: 'project-page',
   templateUrl: './project-page.component.html',
@@ -36,10 +36,7 @@ export class ProjectPageComponent implements OnInit {
   public name: string = "";
   public ownerId: number = 0;
   public creationTime: number = 0;
-
   public workflows: DashboardWorkflowEntry[] = [];
-  public files: DashboardUserFileEntry[] = [];
-
 
   // ----- for workflow card
   public isEditingWorkflowName: number[] = [];
@@ -53,36 +50,21 @@ export class ProjectPageComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private modalService: NgbModal,
-    private workflowPersistService: WorkflowPersistService, // for workflow card
-    private userFileService: UserFileService // for file card
+    private workflowPersistService: WorkflowPersistService,
+    private userFileService: UserFileService
     ) { }
 
   ngOnInit(): void {
     // extract passed PID from parameter
-    console.log("project-page/component: ");
     if (this.route.snapshot.params.pid) {
       this.pid = this.route.snapshot.params.pid;
 
       this.getProjectMetadata();
       this.getWorkflowsOfProject();
-      this.getFilesOfProject();
+      this.userProjectService.refreshFilesOfProject(this.pid);
     }
-    // if (this.route.snapshot.params.obj) {
-    //   console.log("here");
-    //   const project: Project = this.route.snapshot.params.obj;
-    //   this.pid = project.pid;
-    //   this.name = project.name;
-    //   this.ownerId = project.ownerId;
-
-    //   this.getWorkflowsOfProject();
-    //   this.getFilesOfProject();
-    // }
 
     // otherwise no project ID, no project to load
-    
-    // console.log(this.pid);
-    
-    
   }
 
   public onClickOpenAddWorkflow() {
@@ -93,7 +75,6 @@ export class ProjectPageComponent implements OnInit {
     // retrieve updated values from modal via promise
     modalRef.result.then((result) => {
       if (result) {
-        console.log(result);
         this.workflows = result;
       }
     })
@@ -107,7 +88,6 @@ export class ProjectPageComponent implements OnInit {
     // retrieve updated values from modal via promise
     modalRef.result.then((result) => {
       if (result) {
-        console.log(result);
         this.workflows = result;
       }
     })
@@ -115,30 +95,14 @@ export class ProjectPageComponent implements OnInit {
 
   public onClickOpenAddFile() {
     const modalRef = this.modalService.open(NgbdModalAddProjectFileComponent);
-    modalRef.componentInstance.addedFiles = this.files;
+    modalRef.componentInstance.addedFiles = this.getProjectFilesArray();
     modalRef.componentInstance.projectId = this.pid;
-
-    // retreive updated values from modal via promise
-    modalRef.result.then((result) => {
-      if (result) {
-        console.log(result);
-        this.files = result;
-      }
-    })
   }
 
   public onClickOpenRemoveFile() {
     const modalRef = this.modalService.open(NgbdModalRemoveProjectFileComponent);
-    modalRef.componentInstance.addedFiles = this.files;
+    modalRef.componentInstance.addedFiles = this.getProjectFilesArray();
     modalRef.componentInstance.projectId = this.pid;
-
-    // retrieve updated values from modal via promise
-    modalRef.result.then((result) => {
-      if (result) {
-        console.log(result);
-        this.files = result;
-      }
-    })
   }
 
   private getProjectMetadata() {
@@ -158,18 +122,16 @@ export class ProjectPageComponent implements OnInit {
       .pipe(untilDestroyed(this))
       .subscribe(workflows => {
         this.workflows = workflows;
-        // console.log(this.workflows);
       });
   }
 
-  private getFilesOfProject() {
-    this.userProjectService
-      .retrieveFilesOfProject(this.pid)
-      .pipe(untilDestroyed(this))
-      .subscribe(files => {
-        this.files = files;
-        // console.log(this.files);
-      });
+
+  public getProjectFilesArray() : ReadonlyArray<DashboardUserFileEntry>{
+    const fileArray = this.userProjectService.getProjectFiles();
+    if (!fileArray) {
+      return [];
+    }
+    return fileArray;
   }
 
   public jumpToWorkflow({ workflow: { wid } }: DashboardWorkflowEntry): void {
@@ -212,20 +174,25 @@ export class ProjectPageComponent implements OnInit {
   /**
    * duplicate the current workflow. A new record will appear in frontend
    * workflow list and backend database.
+   * 
+   * Modified to also add new workflow to project
    */
-   public onClickDuplicateWorkflow({ workflow: { wid } }: DashboardWorkflowEntry): void {
+
+  public onClickDuplicateWorkflow({ workflow: { wid } }: DashboardWorkflowEntry): void {
     if (wid) {
       this.workflowPersistService
         .duplicateWorkflow(wid)
-        .pipe(untilDestroyed(this))
+        .pipe(
+          concatMap((duplicatedWorkflowInfo: DashboardWorkflowEntry) => {
+            this.workflows.push(duplicatedWorkflowInfo); 
+            return this.userProjectService.addWorkflowToProject(this.pid, duplicatedWorkflowInfo.workflow.wid!)
+          }),
+          catchError(err => {
+            throw err;
+          }),
+          untilDestroyed(this))
         .subscribe(
-          (duplicatedWorkflowInfo: DashboardWorkflowEntry) => {
-            this.workflows.push(duplicatedWorkflowInfo);
-
-            // add to workflow to project as well??
-            // TODO : BETTER WAY TO DO THIS
-            this.userProjectService.addWorkflowToProject(this.pid, duplicatedWorkflowInfo.workflow.wid!).pipe(untilDestroyed(this)).subscribe();
-          },
+          () => {},
           // @ts-ignore // TODO: fix this with notification component
           (err: unknown) => alert(err.error)
         );
@@ -283,18 +250,14 @@ export class ProjectPageComponent implements OnInit {
       .pipe(untilDestroyed(this))
       .subscribe(
         () => {
-          // this.userFileService.refreshDashboardUserFileEntries();
-
-          // -- perform appropriate call for project page
-          this.getFilesOfProject();
+          this.userFileService.refreshDashboardUserFileEntries();
+          this.userProjectService.refreshFilesOfProject(this.pid); // -- perform appropriate call for project page
         },
         (err: unknown) => {
           // @ts-ignore // TODO: fix this with notification component
           this.notificationService.error(err.error.message);
-          // this.userFileService.refreshDashboardUserFileEntries();
-
-          // --- perform appropriate call for project page
-          this.getFilesOfProject();
+          this.userFileService.refreshDashboardUserFileEntries();
+          this.userProjectService.refreshFilesOfProject(this.pid); // -- perform appropriate call for project page
         }
       )
       .add(() => (this.isEditingFileName = this.isEditingFileName.filter(fileIsEditing => fileIsEditing != index)));
@@ -329,5 +292,15 @@ export class ProjectPageComponent implements OnInit {
           this.message.error(err.error.message);
         }
       );
+  }
+
+  /**
+   * Created new implementation in project service to
+   * ensure files in the project page are refreshed
+   * 
+   * @param userFileEntry 
+   */
+  public deleteUserFileEntry(userFileEntry: DashboardUserFileEntry): void {
+    this.userProjectService.deleteDashboardUserFileEntry(this.pid, userFileEntry);
   }
 }

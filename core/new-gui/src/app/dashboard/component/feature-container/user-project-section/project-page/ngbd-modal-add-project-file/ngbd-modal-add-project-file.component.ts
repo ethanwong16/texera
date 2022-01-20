@@ -13,7 +13,7 @@ import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
   styleUrls: ['./ngbd-modal-add-project-file.component.scss']
 })
 export class NgbdModalAddProjectFileComponent implements OnInit {
-  @Input() addedFiles!: DashboardUserFileEntry[];
+  @Input() addedFiles!: ReadonlyArray<DashboardUserFileEntry>;
   @Input() projectId!: number;
 
   public unaddedFiles: ReadonlyArray<DashboardUserFileEntry> = [];
@@ -34,7 +34,7 @@ export class NgbdModalAddProjectFileComponent implements OnInit {
   }
 
   public getFileArray(): ReadonlyArray<DashboardUserFileEntry> {
-    // don't call API again once files list has been received
+    // don't call API again once a files list has been received
     if (this.filesRetrieved) {
       return this.unaddedFiles;
     }
@@ -43,7 +43,7 @@ export class NgbdModalAddProjectFileComponent implements OnInit {
     const fileArray = this.userFileService.getUserFiles();
 
     if (!fileArray) {
-      return []
+      return [];
     } 
 
     // list of files have been updated by service
@@ -51,7 +51,7 @@ export class NgbdModalAddProjectFileComponent implements OnInit {
       this.unaddedFiles = fileArray.filter(fileEntry => fileEntry.file.fid !== undefined && !this.addedFileKeys.has(fileEntry.file.fid!));
       
       // initialize check box tracking & stop callling backend once files have been receieved
-      // therefore this code block only is ran once
+      // prevent continual resetting of checkboxes
       if (this.unaddedFiles.length > 0) {
         this.checkedFiles = new Array(this.unaddedFiles.length).fill(false); // tracks checkboxes for check all feature
         this.filesRetrieved = true; // used to track whether to call backend or not
@@ -79,14 +79,14 @@ export class NgbdModalAddProjectFileComponent implements OnInit {
     for (let index = 0; index < this.checkedFiles.length; ++index) {
       if (this.checkedFiles[index]) {
         observables.push(this.userProjectService.addFileToProject(this.projectId, this.unaddedFiles[index].file.fid!));
-        this.addedFiles.push(this.unaddedFiles[index]);
       }
     }
 
     forkJoin(observables)
        .pipe(untilDestroyed(this))
-       .subscribe(response => {
-         this.activeModal.close(this.addedFiles);
+       .subscribe(() => {
+         this.userProjectService.refreshFilesOfProject(this.projectId);
+         this.activeModal.close();
         });
   }
 

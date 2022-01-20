@@ -95,18 +95,6 @@ class ProjectResource {
     projectDao.fetchByOwnerId(oid)
   }
 
-//  /**
-//    * This method returns the list of projects owned by the specified user.
-//    *
-//    * @param oid owner id
-//    * @return a list of projects belonging to owner
-//    */
-//  @GET
-//  @Path("/list/{oid}")
-//  def listProjectsOwnedByUser(@PathParam("oid") oid: UInteger): util.List[Project] = {
-//    projectDao.fetchByOwnerId(oid)
-//  }
-
   /**
     * This method returns a list of DashboardWorkflowEntry objects, which represents
     * all the workflows that are part of the specified project.
@@ -190,51 +178,6 @@ class ProjectResource {
     files.toList.asJava
   }
 
-//  /**
-//    * This method returns a list of DashboardFileEntry objects, which represents
-//    * all the file objects that are inside the specified project.
-//    *
-//    * Note : since user authentication is not enabled, it temporarily takes in a
-//    * user ID
-//    *
-//    * @param pid project ID
-//    * @param uid user ID
-//    * @return a list of DashboardFileEntry objects
-//    */
-//  @GET
-//  @Path("/files/{pid}/{uid}")
-//  def listProjectFiles(
-//      @PathParam("pid") pid: UInteger,
-//      @PathParam("uid") uid: UInteger
-//  ): util.List[DashboardFileEntry] = {
-//    val fileMappings = fileOfProjectDao.fetchByPid(pid)
-//    val files: mutable.ArrayBuffer[DashboardFileEntry] = mutable.ArrayBuffer()
-//
-//    fileMappings.asScala.toList.map(fileMap => {
-//      val fileID = fileMap.getFid
-//      val fileObject = fileDao.fetchOneByFid(fileID)
-//      val ownerName = userDao.fetchOneByUid(fileObject.getUid).getName
-//      val access = userFileAccessDao.findById(
-//        context.newRecord(USER_FILE_ACCESS.UID, USER_FILE_ACCESS.FID).values(uid, fileID)
-//      )
-//      var accessLevel = "None"
-//      if (access != null && access.getWriteAccess) {
-//        accessLevel = "Write"
-//      } else if (access != null && access.getReadAccess) {
-//        accessLevel = "Read"
-//      }
-//
-//      files += DashboardFileEntry(
-//        ownerName,
-//        accessLevel,
-//        ownerName == userDao.fetchOneByUid(uid).getName,
-//        fileObject
-//      )
-//    })
-//
-//    files.toList.asJava
-//  }
-
   /**
     * This method inserts a new project into the database belonging to the session user
     * and with the specified name.
@@ -247,6 +190,7 @@ class ProjectResource {
   def createProject(@Auth sessionUser: SessionUser, @PathParam("name") name: String): Project = {
     val oid = sessionUser.getUser.getUid
 
+    // check if project with name belonging to this user already exists
     if (
       context.fetchExists(
         context
@@ -259,22 +203,9 @@ class ProjectResource {
     } else {
       val project = new Project(null, name, oid, null);
       projectDao.insert(project);
-      projectDao.fetchOneByPid(project.getPid); // testing this out
+      projectDao.fetchOneByPid(project.getPid);
     }
   }
-
-//  /**
-//    * This method inserts a new project into the database belonging to the specified user
-//    * and with the specified name.
-//    *
-//    * @param oid owner ID
-//    * @param name project name
-//    */
-//  @POST
-//  @Path("/create/{oid}/{name}")
-//  def createProject(@PathParam("oid") oid: UInteger, @PathParam("name") name: String): Unit = {
-//    projectDao.insert(new Project(null, name, oid, null))
-//  }
 
   /**
     * This method adds a mapping between the specified workflow to the specified project

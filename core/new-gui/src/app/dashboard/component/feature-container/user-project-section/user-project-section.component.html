@@ -1,6 +1,6 @@
-<div> <!--class="project-container subsection-grid-container"-->
-    <nz-card> <!-- class="project-section-title subsection-grid-container"-->
-        <h2>Projects</h2> <!-- class="page-title"-->
+<div> 
+    <nz-card> 
+        <h2>Projects</h2> 
         <a nz-dropdown [nzDropdownMenu]="menu">
             <button nz-button>
                 <i nz-icon nzTheme="outline" nzType="sort-ascending"></i>
@@ -34,9 +34,7 @@
 
     <nz-card>
         <nz-list>
-            <!-- <nz-list-item *ngFor="let dashboardUserProjectEntry of getProjectArray();"> -->
-            <!-- <nz-list-item> -->
-            <nz-list-item *ngFor="let dashboardUserProjectEntry of projectEntries;">
+            <nz-list-item *ngFor="let dashboardUserProjectEntry of projectEntries; let i = index">
                 <nz-list-item-meta>
                     <nz-list-item-meta-title>
                         <ng-container *ngIf="projectEntriesIsEditingName.indexOf(dashboardUserProjectEntry.pid) === -1;else editingProject">
@@ -53,12 +51,11 @@
                             </button>
                         </ng-container>
 
-                        <!-- confirmUpdateWorkflowCustomName(dashboardWorkflowEntry, customName.value, indexOfElement) -->
                         <ng-template #editingProject>
                             <input
                               #editedName
                               (focusout)="removeEditStatus(dashboardUserProjectEntry.pid)"
-                              (keyup.enter)="saveProjectName(dashboardUserProjectEntry, editedName.value)"
+                              (keyup.enter)="saveProjectName(dashboardUserProjectEntry, editedName.value, i)"
                               placeholder="{{ dashboardUserProjectEntry.name }}"
                               value="{{ dashboardUserProjectEntry.name }}"
                             />
@@ -74,7 +71,7 @@
                 <ul nz-list-item-actions>
                     <nz-list-item-action>
                         <button
-                            (click) = "deleteProject(dashboardUserProjectEntry.pid)"
+                            (click) = "deleteProject(dashboardUserProjectEntry.pid, i)"
                             nz-button
                             nz-tooltip="Delete the project {{dashboardUserProjectEntry.name}}"
                             nzTooltipPlacement="bottom"
@@ -83,27 +80,6 @@
                         </button>
                     </nz-list-item-action>
                 </ul>
-
-                <!-- <span (click)="jumpToProject(dashboardUserProjectEntry)">{{dashboardUserProjectEntry.name}}</span> -->
-                <!-- <div>
-                    <nz-card>
-                        <h3>Workflows</h3>
-                        <nz-list>
-                            <nz-list-item *ngFor="let workflow of projectWorkflows.get(dashboardUserProjectEntry.pid)">
-                                {{workflow.workflow.name}}
-                            </nz-list-item>
-                        </nz-list>
-                    </nz-card>
-                </div>
-                <div>
-                    <nz-card>
-                        <h3>Files</h3>
-                        <nz-list>
-                            <nz-list-item>example 1</nz-list-item>
-                            <nz-list-item>example 2</nz-list-item>
-                        </nz-list>
-                    </nz-card>
-                </div> -->
             </nz-list-item>
         </nz-list>
     </nz-card>

@@ -18,17 +18,16 @@
         </thead>
         <tbody>
             <tr *ngFor="let fileEntry of addedFiles; let i = index">
-                <!-- <td><input type="checkbox" (change)="processCheck(i)"></td> --> 
                 <td><input type="checkbox" [(ngModel)]="checkedFiles[i]"></td>
                 <td>{{fileEntry.file.fid}}</td>
                 <td>{{fileEntry.ownerName}}</td>
                 <td>{{fileEntry.file.name}}</td>
-                <td>{{fileEntry.file.size}}</td>
+                <td>{{addFileSizeUnit(fileEntry.file.size)}}</td>
             </tr>
         </tbody>
     </table>
 </div>
 
 <div class="modal-footer">
-    <button (click)="submitForm()" aria-label="Confirm" class="close" type="button">Confirm</button>
+    <button (click)="submitForm()" aria-label="Confirm" class="btn btn-primary" type="button">Confirm</button>
 </div>

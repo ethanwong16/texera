@@ -1,17 +1,17 @@
-import { Component, OnInit } from '@angular/core';
-import { UserProjectService } from '../../../service/user-project/user-project.service';
-import { Project } from '../../../type/project';
-import { Router } from '@angular/router';
+import { Component, OnInit } from "@angular/core";
+import { UserProjectService } from "../../../service/user-project/user-project.service";
+import { Project } from "../../../type/project";
+import { Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
-import { NzMessageService } from 'ng-zorro-antd/message';
+import { NzMessageService } from "ng-zorro-antd/message";
 
 export const ROUTER_PROJECT_BASE_URL = "/dashboard/project";
 
 @UntilDestroy()
 @Component({
-  selector: 'user-project-section',
-  templateUrl: './user-project-section.component.html',
-  styleUrls: ['./user-project-section.component.scss']
+  selector: "texera-user-project-section",
+  templateUrl: "./user-project-section.component.html",
+  styleUrls: ["./user-project-section.component.scss"]
 })
 export class UserProjectSectionComponent implements OnInit {
   public projectEntries: Project[] = [];
@@ -55,21 +55,18 @@ export class UserProjectSectionComponent implements OnInit {
     // nothing happens if name is the same
     if (project.name === newName) {
       this.removeEditStatus(project.pid);
-    }
+    } else if (this.projectEntries.filter(p => project.pid !== p.pid && p.name === newName).length > 0) {
+      // checks the projects belonging to user to see if this will create duplicate name
 
-    // checks the projects belonging to user to see if this will create duplicate name
-    else if (this.projectEntries.filter(p => project.pid !== p.pid && p.name === newName).length > 0) {
-      // show error message and don't call backend
-      this.message.create("error", `Project named: ${newName} already exists`)
-    }
-
-    else {
+      // show error message and don"t call backend
+      this.message.create("error", `Project named: ${newName} already exists`);
+    } else {
       this.userProjectService
       .updateProjectName(project.pid, newName)
       .pipe(untilDestroyed(this))
       .subscribe(() => {
         this.removeEditStatus(project.pid);
-        this.getProjectArray(); // refresh list of projects, name is read only property so can't edit
+        this.getProjectArray(); // refresh list of projects, name is read only property so can"t edit
     });
     }
   }
@@ -95,11 +92,9 @@ export class UserProjectSectionComponent implements OnInit {
   public createNewProject(): void{
     // checks the projects belonging to user to see if this will create duplicate name
     if (this.projectEntries.filter(project => project.name === this.createProjectName).length > 0) {
-      // show error message and don't call backend
-      this.message.create("error", `Project named: ${this.createProjectName} already exists`)
-    }
-
-    else {
+      // show error message and don"t call backend
+      this.message.create("error", `Project named: ${this.createProjectName} already exists`);
+    } else {
       this.userProjectService
        .createProject(this.createProjectName)
        .pipe(untilDestroyed(this))
@@ -117,18 +112,18 @@ export class UserProjectSectionComponent implements OnInit {
       p1.creationTime !== undefined && p2.creationTime !== undefined
       ? p1.creationTime - p2.creationTime
       : 0
-    )
+    );
   }
 
   public sortByNameAsc(): void {
     this.projectEntries.sort((p1, p2) => 
       p1.name.toLowerCase().localeCompare(p2.name.toLowerCase())
-    )
+    );
   }
 
   public sortByNameDesc(): void {
     this.projectEntries.sort((p1, p2) => 
       p2.name.toLowerCase().localeCompare(p1.name.toLowerCase())
-    )
+    );
   }
 }

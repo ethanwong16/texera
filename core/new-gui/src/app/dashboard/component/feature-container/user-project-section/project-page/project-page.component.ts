@@ -1,35 +1,35 @@
-import { Component, OnInit } from '@angular/core';
-import { UserProjectService } from '../../../../service/user-project/user-project.service';
+import { Component, OnInit } from "@angular/core";
+import { UserProjectService } from "../../../../service/user-project/user-project.service";
 import { ActivatedRoute } from "@angular/router";
-import { Router } from '@angular/router';
+import { Router } from "@angular/router";
 import { NgbModal } from "@ng-bootstrap/ng-bootstrap";
-import { NgbdModalAddProjectWorkflowComponent } from './ngbd-modal-add-project-workflow/ngbd-modal-add-project-workflow.component';
-import { NgbdModalRemoveProjectWorkflowComponent } from './ngbd-modal-remove-project-workflow/ngbd-modal-remove-project-workflow.component';
-import { NgbdModalAddProjectFileComponent } from './ngbd-modal-add-project-file/ngbd-modal-add-project-file.component';
-import { NgbdModalRemoveProjectFileComponent } from './ngbd-modal-remove-project-file/ngbd-modal-remove-project-file.component';
-import { DashboardWorkflowEntry } from 'src/app/dashboard/type/dashboard-workflow-entry';
-import { DashboardUserFileEntry } from 'src/app/dashboard/type/dashboard-user-file-entry';
-import { concatMap, catchError } from 'rxjs/operators';
+import { NgbdModalAddProjectWorkflowComponent } from "./ngbd-modal-add-project-workflow/ngbd-modal-add-project-workflow.component";
+import { NgbdModalRemoveProjectWorkflowComponent } from "./ngbd-modal-remove-project-workflow/ngbd-modal-remove-project-workflow.component";
+import { NgbdModalAddProjectFileComponent } from "./ngbd-modal-add-project-file/ngbd-modal-add-project-file.component";
+import { NgbdModalRemoveProjectFileComponent } from "./ngbd-modal-remove-project-file/ngbd-modal-remove-project-file.component";
+import { DashboardWorkflowEntry } from "src/app/dashboard/type/dashboard-workflow-entry";
+import { DashboardUserFileEntry } from "src/app/dashboard/type/dashboard-user-file-entry";
+import { concatMap, catchError } from "rxjs/operators";
 
 // ---- for workflow card
-import { WorkflowPersistService } from '../../../../../common/service/workflow-persist/workflow-persist.service';
-import { NgbdModalDeleteWorkflowComponent } from '../../saved-workflow-section/ngbd-modal-delete-workflow/ngbd-modal-delete-workflow.component';
-import { NgbdModalWorkflowShareAccessComponent } from '../../saved-workflow-section/ngbd-modal-share-access/ngbd-modal-workflow-share-access.component';
+import { WorkflowPersistService } from "../../../../../common/service/workflow-persist/workflow-persist.service";
+import { NgbdModalDeleteWorkflowComponent } from "../../saved-workflow-section/ngbd-modal-delete-workflow/ngbd-modal-delete-workflow.component";
+import { NgbdModalWorkflowShareAccessComponent } from "../../saved-workflow-section/ngbd-modal-share-access/ngbd-modal-workflow-share-access.component";
 import { cloneDeep } from "lodash-es";
 import { from } from "rxjs";
 
 // ---- for file card
-import { UserFileService } from '../../../../service/user-file/user-file.service';
+import { UserFileService } from "../../../../service/user-file/user-file.service";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
-import { NgbdModalUserFileShareAccessComponent } from '../../user-file-section/ngbd-modal-file-share-access/ngbd-modal-user-file-share-access.component';
+import { NgbdModalUserFileShareAccessComponent } from "../../user-file-section/ngbd-modal-file-share-access/ngbd-modal-user-file-share-access.component";
 
 export const ROUTER_WORKFLOW_BASE_URL = "/workflow";
 
 @UntilDestroy()
 @Component({
-  selector: 'project-page',
-  templateUrl: './project-page.component.html',
-  styleUrls: ['./project-page.component.scss']
+  selector: "texera-project-page",
+  templateUrl: "./project-page.component.html",
+  styleUrls: ["./project-page.component.scss"]
 })
 export class ProjectPageComponent implements OnInit {
   private pid: number = 0;
@@ -77,7 +77,7 @@ export class ProjectPageComponent implements OnInit {
       if (result) {
         this.workflows = result;
       }
-    })
+    });
   }
 
   public onClickOpenRemoveWorkflow() {
@@ -90,7 +90,7 @@ export class ProjectPageComponent implements OnInit {
       if (result) {
         this.workflows = result;
       }
-    })
+    });
   }
 
   public onClickOpenAddFile() {
@@ -113,7 +113,7 @@ export class ProjectPageComponent implements OnInit {
         this.name = project.name;
         this.ownerId = project.ownerId;
         this.creationTime = project.creationTime;
-      })
+      });
   }
 
   private getWorkflowsOfProject() {
@@ -185,9 +185,9 @@ export class ProjectPageComponent implements OnInit {
         .pipe(
           concatMap((duplicatedWorkflowInfo: DashboardWorkflowEntry) => {
             this.workflows.push(duplicatedWorkflowInfo); 
-            return this.userProjectService.addWorkflowToProject(this.pid, duplicatedWorkflowInfo.workflow.wid!)
+            return this.userProjectService.addWorkflowToProject(this.pid, duplicatedWorkflowInfo.workflow.wid!);
           }),
-          catchError(err => {
+          catchError((err : unknown) => {
             throw err;
           }),
           untilDestroyed(this))

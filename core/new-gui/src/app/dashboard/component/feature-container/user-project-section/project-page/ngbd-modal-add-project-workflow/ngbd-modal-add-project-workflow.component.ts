@@ -1,16 +1,16 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from "@angular/core";
 import { NgbActiveModal } from "@ng-bootstrap/ng-bootstrap";
-import { Observable, forkJoin } from 'rxjs';
-import { WorkflowPersistService } from 'src/app/common/service/workflow-persist/workflow-persist.service';
-import { DashboardWorkflowEntry } from 'src/app/dashboard/type/dashboard-workflow-entry';
-import { UserProjectService } from 'src/app/dashboard/service/user-project/user-project.service';
+import { Observable, forkJoin } from "rxjs";
+import { WorkflowPersistService } from "src/app/common/service/workflow-persist/workflow-persist.service";
+import { DashboardWorkflowEntry } from "src/app/dashboard/type/dashboard-workflow-entry";
+import { UserProjectService } from "src/app/dashboard/service/user-project/user-project.service";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 
 @UntilDestroy()
 @Component({
-  selector: 'ngbd-modal-add-project-workflow',
-  templateUrl: './ngbd-modal-add-project-workflow.component.html',
-  styleUrls: ['./ngbd-modal-add-project-workflow.component.scss']
+  selector: "texera-add-project-workflow-modal",
+  templateUrl: "./ngbd-modal-add-project-workflow.component.html",
+  styleUrls: ["./ngbd-modal-add-project-workflow.component.scss"]
 })
 export class NgbdModalAddProjectWorkflowComponent implements OnInit {
   @Input() addedWorkflows!: DashboardWorkflowEntry[];

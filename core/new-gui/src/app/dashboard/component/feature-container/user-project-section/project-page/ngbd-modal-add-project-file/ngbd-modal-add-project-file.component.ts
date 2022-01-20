@@ -1,16 +1,16 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from "@angular/core";
 import { NgbActiveModal } from "@ng-bootstrap/ng-bootstrap";
-import { Observable, forkJoin } from 'rxjs';
-import { UserFileService } from '../../../../../service/user-file/user-file.service';
-import { UserProjectService } from '../../../../../service/user-project/user-project.service';
-import { DashboardUserFileEntry } from '../../../../../type/dashboard-user-file-entry';
+import { Observable, forkJoin } from "rxjs";
+import { UserFileService } from "../../../../../service/user-file/user-file.service";
+import { UserProjectService } from "../../../../../service/user-project/user-project.service";
+import { DashboardUserFileEntry } from "../../../../../type/dashboard-user-file-entry";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 
 @UntilDestroy()
 @Component({
-  selector: 'ngbd-modal-add-project-file',
-  templateUrl: './ngbd-modal-add-project-file.component.html',
-  styleUrls: ['./ngbd-modal-add-project-file.component.scss']
+  selector: "texera-add-project-file-modal",
+  templateUrl: "./ngbd-modal-add-project-file.component.html",
+  styleUrls: ["./ngbd-modal-add-project-file.component.scss"]
 })
 export class NgbdModalAddProjectFileComponent implements OnInit {
   @Input() addedFiles!: ReadonlyArray<DashboardUserFileEntry>;
@@ -44,10 +44,8 @@ export class NgbdModalAddProjectFileComponent implements OnInit {
 
     if (!fileArray) {
       return [];
-    } 
-
-    // list of files have been updated by service
-    else { 
+    } else {  
+      // list of files have been updated by service
       this.unaddedFiles = fileArray.filter(fileEntry => fileEntry.file.fid !== undefined && !this.addedFileKeys.has(fileEntry.file.fid!));
       
       // initialize check box tracking & stop callling backend once files have been receieved

@@ -1,15 +1,15 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from "@angular/core";
 import { NgbActiveModal } from "@ng-bootstrap/ng-bootstrap";
-import { Observable, forkJoin } from 'rxjs';
-import { UserProjectService } from 'src/app/dashboard/service/user-project/user-project.service';
-import { DashboardWorkflowEntry } from '../../../../../type/dashboard-workflow-entry';
+import { Observable, forkJoin } from "rxjs";
+import { UserProjectService } from "src/app/dashboard/service/user-project/user-project.service";
+import { DashboardWorkflowEntry } from "../../../../../type/dashboard-workflow-entry";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 
 @UntilDestroy()
 @Component({
-  selector: 'ngbd-modal-remove-project-workflow',
-  templateUrl: './ngbd-modal-remove-project-workflow.component.html',
-  styleUrls: ['./ngbd-modal-remove-project-workflow.component.scss']
+  selector: "texera-remove-project-workflow-modal",
+  templateUrl: "./ngbd-modal-remove-project-workflow.component.html",
+  styleUrls: ["./ngbd-modal-remove-project-workflow.component.scss"]
 })
 export class NgbdModalRemoveProjectWorkflowComponent implements OnInit {
   @Input() addedWorkflows!: DashboardWorkflowEntry[];

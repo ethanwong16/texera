@@ -2,12 +2,39 @@ package edu.uci.ics.texera.web.resource.dashboard.project
 
 import edu.uci.ics.texera.web.SqlServer
 import edu.uci.ics.texera.web.auth.SessionUser
-import edu.uci.ics.texera.web.model.jooq.generated.Tables.{FILE, FILE_OF_PROJECT, USER_PROJECT, USER, USER_FILE_ACCESS, WORKFLOW, WORKFLOW_OF_PROJECT, WORKFLOW_OF_USER, WORKFLOW_USER_ACCESS}
-import edu.uci.ics.texera.web.model.jooq.generated.tables.daos.{FileDao, FileOfProjectDao, UserProjectDao, UserDao, UserFileAccessDao, WorkflowDao, WorkflowOfProjectDao, WorkflowOfUserDao}
-import edu.uci.ics.texera.web.model.jooq.generated.tables.pojos.{FileOfProject, UserProject, Workflow, WorkflowOfProject, WorkflowUserAccess, UserFileAccess, File}
-import edu.uci.ics.texera.web.resource.dashboard.project.ProjectResource.{context, fileDao, fileOfProjectDao, userProjectDao, userDao, userFileAccessDao, workflowDao, workflowOfProjectDao, workflowOfUserDao}
+import edu.uci.ics.texera.web.model.jooq.generated.Tables.{
+  FILE,
+  FILE_OF_PROJECT,
+  USER,
+  USER_FILE_ACCESS,
+  WORKFLOW,
+  WORKFLOW_OF_PROJECT,
+  WORKFLOW_OF_USER,
+  WORKFLOW_USER_ACCESS
+}
+import edu.uci.ics.texera.web.model.jooq.generated.tables.daos.{
+  FileOfProjectDao,
+  UserProjectDao,
+  WorkflowOfProjectDao
+}
+import edu.uci.ics.texera.web.model.jooq.generated.tables.pojos.{
+  FileOfProject,
+  UserProject,
+  Workflow,
+  WorkflowOfProject,
+  WorkflowUserAccess,
+  UserFileAccess,
+  File
+}
+import edu.uci.ics.texera.web.resource.dashboard.project.ProjectResource.{
+  context,
+  fileOfProjectDao,
+  userProjectDao,
+  workflowOfProjectDao
+}
 import edu.uci.ics.texera.web.resource.dashboard.file.UserFileResource.DashboardFileEntry
-import edu.uci.ics.texera.web.resource.dashboard.workflow.WorkflowAccessResource.{checkAccessLevel, toAccessLevel}
+import edu.uci.ics.texera.web.resource.dashboard.workflow.WorkflowAccessResource.toAccessLevel
+
 import edu.uci.ics.texera.web.resource.dashboard.workflow.WorkflowResource.DashboardWorkflowEntry
 import org.jooq.types.UInteger
 
@@ -28,14 +55,9 @@ import javax.annotation.security.PermitAll
 
 object ProjectResource {
   final private val context = SqlServer.createDSLContext()
-  final private val userDao = new UserDao(context.configuration)
   final private val userProjectDao = new UserProjectDao(context.configuration)
   final private val workflowOfProjectDao = new WorkflowOfProjectDao(context.configuration)
   final private val fileOfProjectDao = new FileOfProjectDao(context.configuration)
-  final private val workflowDao = new WorkflowDao(context.configuration)
-  final private val workflowOfUserDao = new WorkflowOfUserDao(context.configuration)
-  final private val fileDao = new FileDao(context.configuration)
-  final private val userFileAccessDao = new UserFileAccessDao(context.configuration)
 }
 
 @Path("/project")
@@ -52,13 +74,13 @@ class ProjectResource {
   @GET
   @Path("/{pid}")
   def getProject(@PathParam("pid") pid: UInteger): UserProject = {
-    userProjectDao.fetchOneByPid(pid);
+    userProjectDao.fetchOneByPid(pid)
   }
 
   /**
     * This method returns the list of projects owned by the session user.
     *
-    * @param sessionUser
+    * @param sessionUser the session user
     * @return a list of projects belonging to owner
     */
   @GET
@@ -73,12 +95,15 @@ class ProjectResource {
     * all the workflows that are part of the specified project.
     *
     * @param pid project ID
-    * @param sessionUser
+    * @param sessionUser the session user
     * @return list of DashboardWorkflowEntry objects
     */
   @GET
   @Path("/{pid}/workflows")
-  def listProjectWorkflows(@PathParam("pid") pid: UInteger, @Auth sessionUser: SessionUser): List[DashboardWorkflowEntry] = {
+  def listProjectWorkflows(
+      @PathParam("pid") pid: UInteger,
+      @Auth sessionUser: SessionUser
+  ): List[DashboardWorkflowEntry] = {
     val uid = sessionUser.getUser.getUid
     val workflowEntries = context
       .select(
@@ -106,7 +131,9 @@ class ProjectResource {
       .map(workflowRecord =>
         DashboardWorkflowEntry(
           workflowRecord.into(WORKFLOW_OF_USER).getUid.eq(uid),
-          toAccessLevel(workflowRecord.into(WORKFLOW_USER_ACCESS).into(classOf[WorkflowUserAccess])).toString,
+          toAccessLevel(
+            workflowRecord.into(WORKFLOW_USER_ACCESS).into(classOf[WorkflowUserAccess])
+          ).toString,
           workflowRecord.into(USER).getName,
           workflowRecord.into(WORKFLOW).into(classOf[Workflow])
         )
@@ -119,7 +146,7 @@ class ProjectResource {
     * all the file objects that are part of the specified project.
     *
     * @param pid project ID
-    * @param sessionUser
+    * @param sessionUser the session user
     * @return a list of DashboardFileEntry objects
     */
   @GET
@@ -165,7 +192,7 @@ class ProjectResource {
     * This is a helper function used in creating DashboardFileEntry objects.
     * It extracts the access level given a UserFileAccess generated POJO
     *
-    * @param userFileAccess
+    * @param userFileAccess the UserFileAccess object
     * @return
     */
   def toFileAccessLevel(userFileAccess: UserFileAccess): String = {
@@ -182,15 +209,18 @@ class ProjectResource {
     * This method inserts a new project into the database belonging to the session user
     * and with the specified name.
     *
-    * @param sessionUser
+    * @param sessionUser the session user
     * @param name project name
     */
   @POST
   @Path("/create/{name}")
-  def createProject(@Auth sessionUser: SessionUser, @PathParam("name") name: String): UserProject = {
+  def createProject(
+      @Auth sessionUser: SessionUser,
+      @PathParam("name") name: String
+  ): UserProject = {
     val oid = sessionUser.getUser.getUid
 
-    val userProject = new UserProject(null, name, oid, null);
+    val userProject = new UserProject(null, name, oid, null)
     try {
       userProjectDao.insert(userProject)
     } catch {

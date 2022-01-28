@@ -2,50 +2,22 @@ package edu.uci.ics.texera.web.resource.dashboard.project
 
 import edu.uci.ics.texera.web.SqlServer
 import edu.uci.ics.texera.web.auth.SessionUser
-import edu.uci.ics.texera.web.model.jooq.generated.Tables.{
-  PROJECT,
-  FILE_OF_PROJECT,
-  USER_FILE_ACCESS,
-  WORKFLOW_OF_PROJECT,
-  WORKFLOW_OF_USER
-}
-import edu.uci.ics.texera.web.model.jooq.generated.tables.daos.{
-  FileDao,
-  FileOfProjectDao,
-  ProjectDao,
-  UserDao,
-  UserFileAccessDao,
-  WorkflowDao,
-  WorkflowOfProjectDao,
-  WorkflowOfUserDao
-}
-import edu.uci.ics.texera.web.model.jooq.generated.tables.pojos.{
-  FileOfProject,
-  Project,
-  WorkflowOfProject
-}
-import edu.uci.ics.texera.web.resource.dashboard.project.ProjectResource.{
-  context,
-  fileDao,
-  fileOfProjectDao,
-  projectDao,
-  userDao,
-  userFileAccessDao,
-  workflowDao,
-  workflowOfProjectDao,
-  workflowOfUserDao
-}
+import edu.uci.ics.texera.web.model.jooq.generated.Tables.{FILE, FILE_OF_PROJECT, USER_PROJECT, USER, USER_FILE_ACCESS, WORKFLOW, WORKFLOW_OF_PROJECT, WORKFLOW_OF_USER, WORKFLOW_USER_ACCESS}
+import edu.uci.ics.texera.web.model.jooq.generated.tables.daos.{FileDao, FileOfProjectDao, UserProjectDao, UserDao, UserFileAccessDao, WorkflowDao, WorkflowOfProjectDao, WorkflowOfUserDao}
+import edu.uci.ics.texera.web.model.jooq.generated.tables.pojos.{FileOfProject, UserProject, Workflow, WorkflowOfProject, WorkflowUserAccess, UserFileAccess, File}
+import edu.uci.ics.texera.web.resource.dashboard.project.ProjectResource.{context, fileDao, fileOfProjectDao, userProjectDao, userDao, userFileAccessDao, workflowDao, workflowOfProjectDao, workflowOfUserDao}
 import edu.uci.ics.texera.web.resource.dashboard.file.UserFileResource.DashboardFileEntry
-import edu.uci.ics.texera.web.resource.dashboard.workflow.WorkflowAccessResource.checkAccessLevel
+import edu.uci.ics.texera.web.resource.dashboard.workflow.WorkflowAccessResource.{checkAccessLevel, toAccessLevel}
 import edu.uci.ics.texera.web.resource.dashboard.workflow.WorkflowResource.DashboardWorkflowEntry
 import org.jooq.types.UInteger
 
 import javax.ws.rs._
 import javax.ws.rs.core.MediaType
 import java.util
-import scala.collection.JavaConverters._
-import scala.collection.mutable
+import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import io.dropwizard.auth.Auth
+
+import javax.annotation.security.PermitAll
 
 /**
   * This file handles various request related to projects.
@@ -57,7 +29,7 @@ import io.dropwizard.auth.Auth
 object ProjectResource {
   final private val context = SqlServer.createDSLContext()
   final private val userDao = new UserDao(context.configuration)
-  final private val projectDao = new ProjectDao(context.configuration)
+  final private val userProjectDao = new UserProjectDao(context.configuration)
   final private val workflowOfProjectDao = new WorkflowOfProjectDao(context.configuration)
   final private val fileOfProjectDao = new FileOfProjectDao(context.configuration)
   final private val workflowDao = new WorkflowDao(context.configuration)
@@ -67,6 +39,7 @@ object ProjectResource {
 }
 
 @Path("/project")
+@PermitAll
 @Produces(Array(MediaType.APPLICATION_JSON))
 class ProjectResource {
 
@@ -78,8 +51,8 @@ class ProjectResource {
     */
   @GET
   @Path("/{pid}")
-  def getProject(@PathParam("pid") pid: UInteger): Project = {
-    projectDao.fetchOneByPid(pid);
+  def getProject(@PathParam("pid") pid: UInteger): UserProject = {
+    userProjectDao.fetchOneByPid(pid);
   }
 
   /**
@@ -90,9 +63,9 @@ class ProjectResource {
     */
   @GET
   @Path("/list")
-  def listProjectsOwnedByUser(@Auth sessionUser: SessionUser): util.List[Project] = {
+  def listProjectsOwnedByUser(@Auth sessionUser: SessionUser): util.List[UserProject] = {
     val oid = sessionUser.getUser.getUid
-    projectDao.fetchByOwnerId(oid)
+    userProjectDao.fetchByOwnerId(oid)
   }
 
   /**
@@ -104,35 +77,41 @@ class ProjectResource {
     * @return list of DashboardWorkflowEntry objects
     */
   @GET
-  @Path("/workflows/{pid}")
-  def listProjectWorkflows(
-      @PathParam("pid") pid: UInteger,
-      @Auth sessionUser: SessionUser
-  ): util.List[DashboardWorkflowEntry] = {
-    val workflowMappings = workflowOfProjectDao.fetchByPid(pid)
-    val workflows: mutable.ArrayBuffer[DashboardWorkflowEntry] = mutable.ArrayBuffer()
+  @Path("/{pid}/workflows")
+  def listProjectWorkflows(@PathParam("pid") pid: UInteger, @Auth sessionUser: SessionUser): List[DashboardWorkflowEntry] = {
     val uid = sessionUser.getUser.getUid
-
-    workflowMappings.asScala.toList.map(workflowMap => {
-      val workflowID = workflowMap.getWid
-      val ownerList =
-        workflowOfUserDao.fetchByWid(
-          workflowID
-        ) // should only have one owner per workflow, but just in case
-      val ownerName =
-        if (ownerList.size() > 0) userDao.fetchOneByUid(ownerList.get(0).getUid).getName else "None"
-
-      workflows += DashboardWorkflowEntry(
-        workflowOfUserDao.existsById(
-          context.newRecord(WORKFLOW_OF_USER.UID, WORKFLOW_OF_USER.WID).values(uid, workflowID)
-        ),
-        checkAccessLevel(workflowID, uid).toString,
-        ownerName,
-        workflowDao.fetchOneByWid(workflowID)
+    val workflowEntries = context
+      .select(
+        WORKFLOW.WID,
+        WORKFLOW.NAME,
+        WORKFLOW.CREATION_TIME,
+        WORKFLOW.LAST_MODIFIED_TIME,
+        WORKFLOW_USER_ACCESS.READ_PRIVILEGE,
+        WORKFLOW_USER_ACCESS.WRITE_PRIVILEGE,
+        WORKFLOW_OF_USER.UID,
+        USER.NAME
       )
-    })
-
-    workflows.toList.asJava
+      .from(WORKFLOW_OF_PROJECT)
+      .leftJoin(WORKFLOW)
+      .on(WORKFLOW.WID.eq(WORKFLOW_OF_PROJECT.WID))
+      .leftJoin(WORKFLOW_USER_ACCESS)
+      .on(WORKFLOW_USER_ACCESS.WID.eq(WORKFLOW_OF_PROJECT.WID))
+      .leftJoin(WORKFLOW_OF_USER)
+      .on(WORKFLOW_OF_USER.WID.eq(WORKFLOW_OF_PROJECT.WID))
+      .leftJoin(USER)
+      .on(USER.UID.eq(WORKFLOW_OF_USER.UID))
+      .where(WORKFLOW_OF_PROJECT.PID.eq(pid).and(WORKFLOW_USER_ACCESS.UID.eq(uid)))
+      .fetch()
+    workflowEntries
+      .map(workflowRecord =>
+        DashboardWorkflowEntry(
+          workflowRecord.into(WORKFLOW_OF_USER).getUid.eq(uid),
+          toAccessLevel(workflowRecord.into(WORKFLOW_USER_ACCESS).into(classOf[WorkflowUserAccess])).toString,
+          workflowRecord.into(USER).getName,
+          workflowRecord.into(WORKFLOW).into(classOf[Workflow])
+        )
+      )
+      .toList
   }
 
   /**
@@ -144,38 +123,59 @@ class ProjectResource {
     * @return a list of DashboardFileEntry objects
     */
   @GET
-  @Path("/files/{pid}")
+  @Path("/{pid}/files")
   def listProjectFiles(
       @PathParam("pid") pid: UInteger,
       @Auth sessionUser: SessionUser
-  ): util.List[DashboardFileEntry] = {
-    val fileMappings = fileOfProjectDao.fetchByPid(pid)
-    val files: mutable.ArrayBuffer[DashboardFileEntry] = mutable.ArrayBuffer()
-    val uid = sessionUser.getUser.getUid
-
-    fileMappings.asScala.toList.map(fileMap => {
-      val fileID = fileMap.getFid
-      val fileObject = fileDao.fetchOneByFid(fileID)
-      val ownerName = userDao.fetchOneByUid(fileObject.getUid).getName
-      val access = userFileAccessDao.findById(
-        context.newRecord(USER_FILE_ACCESS.UID, USER_FILE_ACCESS.FID).values(uid, fileID)
+  ): List[DashboardFileEntry] = {
+    val user = sessionUser.getUser
+    val fileEntries = context
+      .select(
+        FILE.FID,
+        FILE.SIZE,
+        FILE.NAME,
+        FILE.PATH,
+        FILE.DESCRIPTION,
+        USER_FILE_ACCESS.READ_ACCESS,
+        USER_FILE_ACCESS.WRITE_ACCESS,
+        USER.NAME // owner name
       )
-      var accessLevel = "None"
-      if (access != null && access.getWriteAccess) {
-        accessLevel = "Write"
-      } else if (access != null && access.getReadAccess) {
-        accessLevel = "Read"
-      }
-
-      files += DashboardFileEntry(
-        ownerName,
-        accessLevel,
-        ownerName == userDao.fetchOneByUid(uid).getName,
-        fileObject
+      .from(FILE_OF_PROJECT)
+      .leftJoin(FILE)
+      .on(FILE.FID.eq(FILE_OF_PROJECT.FID))
+      .leftJoin(USER_FILE_ACCESS)
+      .on(USER_FILE_ACCESS.FID.eq(FILE_OF_PROJECT.FID))
+      .leftJoin(USER)
+      .on(USER.UID.eq(FILE.UID))
+      .where(FILE_OF_PROJECT.PID.eq(pid).and(USER_FILE_ACCESS.UID.eq(user.getUid)))
+      .fetch()
+    fileEntries
+      .map(fileRecord =>
+        DashboardFileEntry(
+          fileRecord.into(USER).getName,
+          toFileAccessLevel(fileRecord.into(USER_FILE_ACCESS).into(classOf[UserFileAccess])),
+          fileRecord.into(USER).getName == user.getName,
+          fileRecord.into(FILE).into(classOf[File])
+        )
       )
-    })
+      .toList
+  }
 
-    files.toList.asJava
+  /**
+    * This is a helper function used in creating DashboardFileEntry objects.
+    * It extracts the access level given a UserFileAccess generated POJO
+    *
+    * @param userFileAccess
+    * @return
+    */
+  def toFileAccessLevel(userFileAccess: UserFileAccess): String = {
+    if (userFileAccess.getWriteAccess) {
+      "Write"
+    } else if (userFileAccess.getReadAccess) {
+      "Read"
+    } else {
+      "None"
+    }
   }
 
   /**
@@ -187,24 +187,16 @@ class ProjectResource {
     */
   @POST
   @Path("/create/{name}")
-  def createProject(@Auth sessionUser: SessionUser, @PathParam("name") name: String): Project = {
+  def createProject(@Auth sessionUser: SessionUser, @PathParam("name") name: String): UserProject = {
     val oid = sessionUser.getUser.getUid
 
-    // check if project with name belonging to this user already exists
-    if (
-      context.fetchExists(
-        context
-          .selectOne()
-          .from(PROJECT)
-          .where(PROJECT.NAME.eq(name), PROJECT.OWNER_ID.eq(oid))
-      )
-    ) {
-      throw new BadRequestException("Cannot create a new workflow with provided name.");
-    } else {
-      val project = new Project(null, name, oid, null);
-      projectDao.insert(project);
-      projectDao.fetchOneByPid(project.getPid);
+    val userProject = new UserProject(null, name, oid, null);
+    try {
+      userProjectDao.insert(userProject)
+    } catch {
+      case _ => throw new BadRequestException("Cannot create a new project with provided name.");
     }
+    userProjectDao.fetchOneByPid(userProject.getPid)
   }
 
   /**
@@ -215,7 +207,7 @@ class ProjectResource {
     * @param wid workflow ID
     */
   @POST
-  @Path("/addWorkflow/{pid}/{wid}")
+  @Path("/{pid}/workflow/{wid}/add")
   def addWorkflowToProject(
       @PathParam("pid") pid: UInteger,
       @PathParam("wid") wid: UInteger
@@ -231,7 +223,7 @@ class ProjectResource {
     * @param fid file ID
     */
   @POST
-  @Path("/addFile/{pid}/{fid}")
+  @Path("/{pid}/user-file/{fid}/add")
   def addFileToProject(@PathParam("pid") pid: UInteger, @PathParam("fid") fid: UInteger): Unit = {
     fileOfProjectDao.insert(new FileOfProject(fid, pid))
   }
@@ -243,11 +235,15 @@ class ProjectResource {
     * @param name new name
     */
   @POST
-  @Path("/update/{pid}/{name}")
+  @Path("/{pid}/rename/{name}")
   def updateProjectName(@PathParam("pid") pid: UInteger, @PathParam("name") name: String): Unit = {
-    val project = projectDao.fetchOneByPid(pid)
-    project.setName(name)
-    projectDao.update(project)
+    val userProject = userProjectDao.fetchOneByPid(pid)
+    try {
+      userProject.setName(name)
+      userProjectDao.update(userProject)
+    } catch {
+      case _ => throw new BadRequestException("Cannot rename project to provided name.");
+    }
   }
 
   /**
@@ -258,7 +254,7 @@ class ProjectResource {
   @DELETE
   @Path("/delete/{pid}")
   def deleteProject(@PathParam("pid") pid: UInteger): Unit = {
-    projectDao.deleteById(pid)
+    userProjectDao.deleteById(pid)
   }
 
   /**
@@ -269,7 +265,7 @@ class ProjectResource {
     * @param wid workflow ID
     */
   @DELETE
-  @Path("/deleteWorkflow/{pid}/{wid}")
+  @Path("/{pid}/workflow/{wid}/delete")
   def deleteWorkflowFromProject(
       @PathParam("pid") pid: UInteger,
       @PathParam("wid") wid: UInteger
@@ -287,7 +283,7 @@ class ProjectResource {
     * @param fid file ID
     */
   @DELETE
-  @Path("/deleteFile/{pid}/{fid}")
+  @Path("/{pid}/user-file/{fid}/delete")
   def deleteFileFromProject(
       @PathParam("pid") pid: UInteger,
       @PathParam("fid") fid: UInteger

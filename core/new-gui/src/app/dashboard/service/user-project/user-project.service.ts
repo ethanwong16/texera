@@ -9,15 +9,8 @@ import { UserFileService } from "../user-file/user-file.service";
 
 export const PROJECT_BASE_URL = `${AppSettings.getApiEndpoint()}/project`;
 export const USER_PROJECT_LIST_URL = `${PROJECT_BASE_URL}/list`;
-export const WORKFLOW_OF_PROJECT_URL = `${PROJECT_BASE_URL}/workflows`;
-export const FILE_OF_PROJECT_URL = `${PROJECT_BASE_URL}/files`;
-export const RENAME_PROJECT_URL = `${PROJECT_BASE_URL}/update`;
 export const DELETE_PROJECT_URL = `${PROJECT_BASE_URL}/delete`;
 export const CREATE_PROJECT_URL = `${PROJECT_BASE_URL}/create`;
-export const ADD_WORKFLOW_TO_PROJECT_URL = `${PROJECT_BASE_URL}/addWorkflow`;
-export const DELETE_WORKFLOW_FROM_PROJECT_URL = `${PROJECT_BASE_URL}/deleteWorkflow`;
-export const ADD_FILE_TO_PROJECT_URL = `${PROJECT_BASE_URL}/addFile`;
-export const DELETE_FILE_FROM_PROJECT_URL = `${PROJECT_BASE_URL}/deleteFile`;
 
 export const USER_FILE_BASE_URL = `${AppSettings.getApiEndpoint()}/user/file`;
 export const USER_FILE_DELETE_URL = `${USER_FILE_BASE_URL}/delete`;
@@ -36,11 +29,11 @@ export class UserProjectService {
   }
 
   public retrieveWorkflowsOfProject(pid: number) : Observable<DashboardWorkflowEntry[]>{
-    return this.http.get<DashboardWorkflowEntry[]>(`${WORKFLOW_OF_PROJECT_URL}/` + pid);
+    return this.http.get<DashboardWorkflowEntry[]>(`${PROJECT_BASE_URL}/${pid}/workflows`);
   }
 
   public retrieveFilesOfProject(pid: number) : Observable<DashboardUserFileEntry[]>{
-    return this.http.get<DashboardUserFileEntry[]>(`${FILE_OF_PROJECT_URL}/` + pid );
+    return this.http.get<DashboardUserFileEntry[]>(`${PROJECT_BASE_URL}/${pid}/files`);
   }
 
   public getProjectFiles(): ReadonlyArray<DashboardUserFileEntry> {
@@ -59,7 +52,7 @@ export class UserProjectService {
   }
 
   public updateProjectName(pid: number, name: string) : Observable<Response>{
-    return this.http.post<Response>(`${RENAME_PROJECT_URL}/` + pid + "/" + name, {});
+    return this.http.post<Response>(`${PROJECT_BASE_URL}/${pid}/rename/${name}`, {});
   }
 
   public deleteProject(pid: number): Observable<Response> {
@@ -71,19 +64,19 @@ export class UserProjectService {
   }
 
   public addWorkflowToProject(pid: number, wid: number): Observable<Response>{
-    return this.http.post<Response>(`${ADD_WORKFLOW_TO_PROJECT_URL}/` + pid + "/" + wid, {});
+    return this.http.post<Response>(`${PROJECT_BASE_URL}/${pid}/workflow/${wid}/add`, {});
   }
 
   public removeWorkflowFromProject(pid: number, wid: number): Observable<Response>{
-    return this.http.delete<Response>(`${DELETE_WORKFLOW_FROM_PROJECT_URL}/` + pid + "/" + wid, {});
+    return this.http.delete<Response>(`${PROJECT_BASE_URL}/${pid}/workflow/${wid}/delete`, {});
   }
 
   public addFileToProject(pid: number, fid: number): Observable<Response>{
-    return this.http.post<Response>(`${ADD_FILE_TO_PROJECT_URL}/` + pid + "/" + fid, {});
+    return this.http.post<Response>(`${PROJECT_BASE_URL}/${pid}/user-file/${fid}/add`, {});
   }
 
   public removeFileFromProject(pid: number, fid: number): Observable<Response>{
-    return this.http.delete<Response>(`${DELETE_FILE_FROM_PROJECT_URL}/` + pid + "/" + fid, {});
+    return this.http.delete<Response>(`${PROJECT_BASE_URL}/${pid}/user-file/${fid}/delete`, {});
   }
 
   /**

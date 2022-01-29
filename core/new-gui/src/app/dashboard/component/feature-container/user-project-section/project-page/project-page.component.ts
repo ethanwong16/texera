@@ -17,6 +17,7 @@ import { NgbdModalDeleteWorkflowComponent } from "../../saved-workflow-section/n
 import { NgbdModalWorkflowShareAccessComponent } from "../../saved-workflow-section/ngbd-modal-share-access/ngbd-modal-workflow-share-access.component";
 import { cloneDeep } from "lodash-es";
 import { from } from "rxjs";
+import { NotificationService } from "../../../../../common/service/notification/notification.service";
 
 // ---- for file card
 import { UserFileService } from "../../../../service/user-file/user-file.service";
@@ -34,7 +35,7 @@ export const ROUTER_WORKFLOW_BASE_URL = "/workflow";
 export class ProjectPageComponent implements OnInit {
   private pid: number = 0;
   public name: string = "";
-  public ownerId: number = 0;
+  public ownerID: number = 0;
   public creationTime: number = 0;
   public workflows: DashboardWorkflowEntry[] = [];
 
@@ -51,7 +52,8 @@ export class ProjectPageComponent implements OnInit {
     private router: Router,
     private modalService: NgbModal,
     private workflowPersistService: WorkflowPersistService,
-    private userFileService: UserFileService
+    private userFileService: UserFileService,
+    private notificationService: NotificationService
     ) { }
 
   ngOnInit(): void {
@@ -111,7 +113,7 @@ export class ProjectPageComponent implements OnInit {
       .pipe(untilDestroyed(this))
       .subscribe(project => {
         this.name = project.name;
-        this.ownerId = project.ownerId;
+        this.ownerID = project.ownerID;
         this.creationTime = project.creationTime;
       });
   }
@@ -288,8 +290,8 @@ export class ProjectPageComponent implements OnInit {
           URL.revokeObjectURL(downloadLink.href);
         },
         (err: unknown) => {
-          // @ts-ignore // TODO: fix this with notification component
-          this.message.error(err.error.message);
+          // @ts-ignore
+          this.notificationService.error(err.error.message);
         }
       );
   }

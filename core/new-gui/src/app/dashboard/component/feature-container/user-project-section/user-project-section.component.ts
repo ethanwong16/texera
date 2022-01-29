@@ -3,7 +3,7 @@ import { UserProjectService } from "../../../service/user-project/user-project.s
 import { Project } from "../../../type/project";
 import { Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
-import { NzMessageService } from "ng-zorro-antd/message";
+import { NotificationService } from "../../../../common/service/notification/notification.service";
 
 export const ROUTER_PROJECT_BASE_URL = "/dashboard/project";
 
@@ -22,7 +22,7 @@ export class UserProjectSectionComponent implements OnInit {
   constructor(
     private userProjectService: UserProjectService,
     private router: Router,
-    private message: NzMessageService
+    private notificationService: NotificationService
   ) { 
   }
 
@@ -55,19 +55,17 @@ export class UserProjectSectionComponent implements OnInit {
     // nothing happens if name is the same
     if (project.name === newName) {
       this.removeEditStatus(project.pid);
-    } else if (this.projectEntries.filter(p => project.pid !== p.pid && p.name === newName).length > 0) {
-      // checks the projects belonging to user to see if this will create duplicate name
-
-      // show error message and don"t call backend
-      this.message.create("error", `Project named: ${newName} already exists`);
-    } else {
+    } else if (this.isValidNewProjectName(newName, project)) {
       this.userProjectService
       .updateProjectName(project.pid, newName)
       .pipe(untilDestroyed(this))
       .subscribe(() => {
         this.removeEditStatus(project.pid);
         this.getProjectArray(); // refresh list of projects, name is read only property so can"t edit
-    });
+      });
+    } else {
+      // show error message and don"t call backend
+      this.notificationService.error(`Cannot create project named: "${newName}".  It must be a non-empty, unique name`);
     }
   }
 
@@ -90,11 +88,7 @@ export class UserProjectSectionComponent implements OnInit {
   }
 
   public createNewProject(): void{
-    // checks the projects belonging to user to see if this will create duplicate name
-    if (this.projectEntries.filter(project => project.name === this.createProjectName).length > 0) {
-      // show error message and don"t call backend
-      this.message.create("error", `Project named: ${this.createProjectName} already exists`);
-    } else {
+    if (this.isValidNewProjectName(this.createProjectName)) {
       this.userProjectService
        .createProject(this.createProjectName)
        .pipe(untilDestroyed(this))
@@ -104,6 +98,17 @@ export class UserProjectSectionComponent implements OnInit {
           this.unclickCreateButton();
         }
       );
+    } else {
+      // show error message and don't call backend
+      this.notificationService.error(`Cannot create project named: "${this.createProjectName}".  It must be a non-empty, unique name`);
+    }
+  }
+
+  private isValidNewProjectName(newName: string, oldProject?: Project): boolean {
+    if (typeof oldProject === 'undefined') {
+      return newName.length != 0 && this.projectEntries.filter(project => project.name === newName).length === 0;
+    } else {
+      return newName.length != 0 && this.projectEntries.filter(project => project.pid !== oldProject.pid && project.name === newName).length === 0; 
     }
   }
 

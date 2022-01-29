@@ -33,6 +33,8 @@ if (environment.userSystemEnabled) {
    *  The saved workflow is under path '/dashboard/workflow'
    *  The user file is under path '/dashboard/user-file'
    *  The user dictionary is under path '/dashboard/user-dictionary'
+   *  The project is under path '/dashboard/project'
+   *  The single project page is under path 'dashboard/project/{pid}'
    */
 
   routes.push({

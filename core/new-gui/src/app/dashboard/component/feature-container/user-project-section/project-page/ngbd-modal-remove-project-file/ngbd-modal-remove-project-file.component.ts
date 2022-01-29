@@ -13,7 +13,6 @@ import { UserFileService } from "../../../../../service/user-file/user-file.serv
   styleUrls: ["./ngbd-modal-remove-project-file.component.scss"]
 })
 export class NgbdModalRemoveProjectFileComponent implements OnInit {
-  // @Input() addedFiles!: DashboardUserFileEntry[];
   @Input() addedFiles!: ReadonlyArray<DashboardUserFileEntry>;
   @Input() projectId!: number;
 

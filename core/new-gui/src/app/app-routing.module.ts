@@ -6,8 +6,8 @@ import { DashboardComponent } from "./dashboard/component/dashboard.component";
 import { SavedWorkflowSectionComponent } from "./dashboard/component/feature-container/saved-workflow-section/saved-workflow-section.component";
 import { UserDictionarySectionComponent } from "./dashboard/component/feature-container/user-dictionary-section/user-dictionary-section.component";
 import { UserFileSectionComponent } from "./dashboard/component/feature-container/user-file-section/user-file-section.component";
-import { ProjectPageComponent } from "./dashboard/component/feature-container/user-project-section/project-page/project-page.component";
-import { UserProjectSectionComponent } from "./dashboard/component/feature-container/user-project-section/user-project-section.component";
+import { UserProjectSectionComponent } from "./dashboard/component/feature-container/user-project-list/user-project-section/user-project-section.component";
+import { UserProjectListComponent } from "./dashboard/component/feature-container/user-project-list/user-project-list.component";
 
 
 import { WorkspaceComponent } from "./workspace/component/workspace.component";
@@ -33,8 +33,8 @@ if (environment.userSystemEnabled) {
    *  The saved workflow is under path '/dashboard/workflow'
    *  The user file is under path '/dashboard/user-file'
    *  The user dictionary is under path '/dashboard/user-dictionary'
-   *  The project is under path '/dashboard/project'
-   *  The single project page is under path 'dashboard/project/{pid}'
+   *  The user project list is under path '/dashboard/project'
+   *  The single user project is under path 'dashboard/project/{pid}'
    */
 
   routes.push({
@@ -42,12 +42,12 @@ if (environment.userSystemEnabled) {
     component: DashboardComponent,
     children: [
       {
-        path: "project",
-        component: UserProjectSectionComponent,
+        path: "user-project",
+        component: UserProjectListComponent,
       },
       {
-        path: "project/:pid",
-        component: ProjectPageComponent,
+        path: "user-project/:pid",
+        component: UserProjectSectionComponent,
       },
       {
         path: "workflow",

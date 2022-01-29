@@ -1,4 +1,4 @@
-export interface Project
+export interface UserProject
   extends Readonly<{
     pid: number;
     name: string;

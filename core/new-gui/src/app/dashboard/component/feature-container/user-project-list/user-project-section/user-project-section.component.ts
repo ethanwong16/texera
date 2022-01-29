@@ -7,8 +7,8 @@ import { NgbdModalAddProjectWorkflowComponent } from "./ngbd-modal-add-project-w
 import { NgbdModalRemoveProjectWorkflowComponent } from "./ngbd-modal-remove-project-workflow/ngbd-modal-remove-project-workflow.component";
 import { NgbdModalAddProjectFileComponent } from "./ngbd-modal-add-project-file/ngbd-modal-add-project-file.component";
 import { NgbdModalRemoveProjectFileComponent } from "./ngbd-modal-remove-project-file/ngbd-modal-remove-project-file.component";
-import { DashboardWorkflowEntry } from "src/app/dashboard/type/dashboard-workflow-entry";
-import { DashboardUserFileEntry } from "src/app/dashboard/type/dashboard-user-file-entry";
+import { DashboardWorkflowEntry } from "../../../../type/dashboard-workflow-entry";
+import { DashboardUserFileEntry } from "../../../../type/dashboard-user-file-entry";
 import { concatMap, catchError } from "rxjs/operators";
 
 // ---- for workflow card
@@ -28,11 +28,11 @@ export const ROUTER_WORKFLOW_BASE_URL = "/workflow";
 
 @UntilDestroy()
 @Component({
-  selector: "texera-project-page",
-  templateUrl: "./project-page.component.html",
-  styleUrls: ["./project-page.component.scss"]
+  selector: "texera-user-project-section",
+  templateUrl: "./user-project-section.component.html",
+  styleUrls: ["./user-project-section.component.scss"]
 })
-export class ProjectPageComponent implements OnInit {
+export class UserProjectSectionComponent implements OnInit {
   private pid: number = 0;
   public name: string = "";
   public ownerID: number = 0;
@@ -61,7 +61,7 @@ export class ProjectPageComponent implements OnInit {
     if (this.route.snapshot.params.pid) {
       this.pid = this.route.snapshot.params.pid;
 
-      this.getProjectMetadata();
+      this.getUserProjectMetadata();
       this.getWorkflowsOfProject();
       this.userProjectService.refreshFilesOfProject(this.pid);
     }
@@ -97,17 +97,17 @@ export class ProjectPageComponent implements OnInit {
 
   public onClickOpenAddFile() {
     const modalRef = this.modalService.open(NgbdModalAddProjectFileComponent);
-    modalRef.componentInstance.addedFiles = this.getProjectFilesArray();
+    modalRef.componentInstance.addedFiles = this.getUserProjectFilesArray();
     modalRef.componentInstance.projectId = this.pid;
   }
 
   public onClickOpenRemoveFile() {
     const modalRef = this.modalService.open(NgbdModalRemoveProjectFileComponent);
-    modalRef.componentInstance.addedFiles = this.getProjectFilesArray();
+    modalRef.componentInstance.addedFiles = this.getUserProjectFilesArray();
     modalRef.componentInstance.projectId = this.pid;
   }
 
-  private getProjectMetadata() {
+  private getUserProjectMetadata() {
     this.userProjectService
       .retrieveProject(this.pid)
       .pipe(untilDestroyed(this))
@@ -128,7 +128,7 @@ export class ProjectPageComponent implements OnInit {
   }
 
 
-  public getProjectFilesArray() : ReadonlyArray<DashboardUserFileEntry>{
+  public getUserProjectFilesArray() : ReadonlyArray<DashboardUserFileEntry>{
     const fileArray = this.userProjectService.getProjectFiles();
     if (!fileArray) {
       return [];

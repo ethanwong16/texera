@@ -1,21 +1,21 @@
 import { Component, OnInit } from "@angular/core";
 import { UserProjectService } from "../../../service/user-project/user-project.service";
-import { Project } from "../../../type/project";
+import { UserProject } from "../../../type/user-project";
 import { Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { NotificationService } from "../../../../common/service/notification/notification.service";
 
-export const ROUTER_PROJECT_BASE_URL = "/dashboard/project";
+export const ROUTER_USER_PROJECT_BASE_URL = "/dashboard/user-project";
 
 @UntilDestroy()
 @Component({
-  selector: "texera-user-project-section",
-  templateUrl: "./user-project-section.component.html",
-  styleUrls: ["./user-project-section.component.scss"]
+  selector: "texera-user-project-list",
+  templateUrl: "./user-project-list.component.html",
+  styleUrls: ["./user-project-list.component.scss"]
 })
-export class UserProjectSectionComponent implements OnInit {
-  public projectEntries: Project[] = [];
-  public projectEntriesIsEditingName: number[] = [];
+export class UserProjectListComponent implements OnInit {
+  public userProjectEntries: UserProject[] = [];
+  public userProjectEntriesIsEditingName: number[] = [];
   public createButtonIsClicked: boolean = false;
   public createProjectName: string = "";
 
@@ -27,31 +27,31 @@ export class UserProjectSectionComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.getProjectArray();
+    this.getUserProjectArray();
   }
 
-  private getProjectArray() {
+  private getUserProjectArray() {
     
     this.userProjectService
       .retrieveProjectList()
       .pipe(untilDestroyed(this))
       .subscribe(projectEntries => {
-        this.projectEntries = projectEntries;
+        this.userProjectEntries = projectEntries;
       });
   }
 
   /**
    * navigate to individual project page
    */
-  public jumpToProject({ pid }: Project): void {
-    this.router.navigate([`${ROUTER_PROJECT_BASE_URL}/${pid}`]).then(null);
+  public jumpToProject({ pid }: UserProject): void {
+    this.router.navigate([`${ROUTER_USER_PROJECT_BASE_URL}/${pid}`]).then(null);
   }
 
   public removeEditStatus(pid : number): void {
-    this.projectEntriesIsEditingName = this.projectEntriesIsEditingName.filter(index => index != pid);
+    this.userProjectEntriesIsEditingName = this.userProjectEntriesIsEditingName.filter(index => index != pid);
   }
 
-  public saveProjectName(project: Project, newName: string, index: number): void {
+  public saveProjectName(project: UserProject, newName: string, index: number): void {
     // nothing happens if name is the same
     if (project.name === newName) {
       this.removeEditStatus(project.pid);
@@ -61,7 +61,7 @@ export class UserProjectSectionComponent implements OnInit {
       .pipe(untilDestroyed(this))
       .subscribe(() => {
         this.removeEditStatus(project.pid);
-        this.getProjectArray(); // refresh list of projects, name is read only property so can"t edit
+        this.getUserProjectArray(); // refresh list of projects, name is read only property so can"t edit
       });
     } else {
       // show error message and don"t call backend
@@ -74,7 +74,7 @@ export class UserProjectSectionComponent implements OnInit {
       .deleteProject(pid)
       .pipe(untilDestroyed(this))
       .subscribe(() => {
-        this.projectEntries.splice(index, 1); // update local list of projects
+        this.userProjectEntries.splice(index, 1); // update local list of projects
     });
   }
 
@@ -94,7 +94,7 @@ export class UserProjectSectionComponent implements OnInit {
        .pipe(untilDestroyed(this))
        .subscribe(
          (createdProject) => {
-          this.projectEntries.push(createdProject); // update local list of projects
+          this.userProjectEntries.push(createdProject); // update local list of projects
           this.unclickCreateButton();
         }
       );
@@ -104,16 +104,16 @@ export class UserProjectSectionComponent implements OnInit {
     }
   }
 
-  private isValidNewProjectName(newName: string, oldProject?: Project): boolean {
+  private isValidNewProjectName(newName: string, oldProject?: UserProject): boolean {
     if (typeof oldProject === "undefined") {
-      return newName.length != 0 && this.projectEntries.filter(project => project.name === newName).length === 0;
+      return newName.length != 0 && this.userProjectEntries.filter(project => project.name === newName).length === 0;
     } else {
-      return newName.length != 0 && this.projectEntries.filter(project => project.pid !== oldProject.pid && project.name === newName).length === 0; 
+      return newName.length != 0 && this.userProjectEntries.filter(project => project.pid !== oldProject.pid && project.name === newName).length === 0; 
     }
   }
 
   public sortByCreationTime(): void {
-    this.projectEntries.sort((p1, p2) => 
+    this.userProjectEntries.sort((p1, p2) => 
       p1.creationTime !== undefined && p2.creationTime !== undefined
       ? p1.creationTime - p2.creationTime
       : 0
@@ -121,13 +121,13 @@ export class UserProjectSectionComponent implements OnInit {
   }
 
   public sortByNameAsc(): void {
-    this.projectEntries.sort((p1, p2) => 
+    this.userProjectEntries.sort((p1, p2) => 
       p1.name.toLowerCase().localeCompare(p2.name.toLowerCase())
     );
   }
 
   public sortByNameDesc(): void {
-    this.projectEntries.sort((p1, p2) => 
+    this.userProjectEntries.sort((p1, p2) => 
       p2.name.toLowerCase().localeCompare(p1.name.toLowerCase())
     );
   }

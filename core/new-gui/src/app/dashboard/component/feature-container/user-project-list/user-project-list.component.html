@@ -34,13 +34,13 @@
 
     <nz-card>
         <nz-list>
-            <nz-list-item *ngFor="let dashboardUserProjectEntry of projectEntries; let i = index">
+            <nz-list-item *ngFor="let dashboardUserProjectEntry of userProjectEntries; let i = index">
                 <nz-list-item-meta>
                     <nz-list-item-meta-title>
-                        <ng-container *ngIf="projectEntriesIsEditingName.indexOf(dashboardUserProjectEntry.pid) === -1;else editingProject">
+                        <ng-container *ngIf="userProjectEntriesIsEditingName.indexOf(dashboardUserProjectEntry.pid) === -1;else editingProject">
                             <span class="project-name" (click)="jumpToProject(dashboardUserProjectEntry)">{{dashboardUserProjectEntry.name}}</span>
                             <button
-                                (click)="projectEntriesIsEditingName.push(dashboardUserProjectEntry.pid)"
+                                (click)="userProjectEntriesIsEditingName.push(dashboardUserProjectEntry.pid)"
                                 nz-button
                                 nz-tooltip="Edit Project Name"
                                 nzTooltipPlacement="top"

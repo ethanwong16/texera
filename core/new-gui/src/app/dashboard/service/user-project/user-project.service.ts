@@ -1,16 +1,16 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
-import { Observable, Subject } from "rxjs";
+import { Observable } from "rxjs";
 import { AppSettings } from "../../../common/app-setting";
 import { DashboardWorkflowEntry } from "../../type/dashboard-workflow-entry";
 import { DashboardUserFileEntry } from "../../type/dashboard-user-file-entry";
-import { Project } from "../../type/project";
+import { UserProject } from "../../type/user-project";
 import { UserFileService } from "../user-file/user-file.service";
 
-export const PROJECT_BASE_URL = `${AppSettings.getApiEndpoint()}/project`;
-export const USER_PROJECT_LIST_URL = `${PROJECT_BASE_URL}/list`;
-export const DELETE_PROJECT_URL = `${PROJECT_BASE_URL}/delete`;
-export const CREATE_PROJECT_URL = `${PROJECT_BASE_URL}/create`;
+export const USER_PROJECT_BASE_URL = `${AppSettings.getApiEndpoint()}/project`;
+export const USER_PROJECT_LIST_URL = `${USER_PROJECT_BASE_URL}/list`;
+export const DELETE_PROJECT_URL = `${USER_PROJECT_BASE_URL}/delete`;
+export const CREATE_PROJECT_URL = `${USER_PROJECT_BASE_URL}/create`;
 
 export const USER_FILE_BASE_URL = `${AppSettings.getApiEndpoint()}/user/file`;
 export const USER_FILE_DELETE_URL = `${USER_FILE_BASE_URL}/delete`;
@@ -24,16 +24,16 @@ export class UserProjectService {
   constructor(private http: HttpClient, private userFileService: UserFileService) { 
   }
 
-  public retrieveProjectList() : Observable<Project[]>{
-    return this.http.get<Project[]>(`${USER_PROJECT_LIST_URL}`);
+  public retrieveProjectList() : Observable<UserProject[]>{
+    return this.http.get<UserProject[]>(`${USER_PROJECT_LIST_URL}`);
   }
 
   public retrieveWorkflowsOfProject(pid: number) : Observable<DashboardWorkflowEntry[]>{
-    return this.http.get<DashboardWorkflowEntry[]>(`${PROJECT_BASE_URL}/${pid}/workflows`);
+    return this.http.get<DashboardWorkflowEntry[]>(`${USER_PROJECT_BASE_URL}/${pid}/workflows`);
   }
 
   public retrieveFilesOfProject(pid: number) : Observable<DashboardUserFileEntry[]>{
-    return this.http.get<DashboardUserFileEntry[]>(`${PROJECT_BASE_URL}/${pid}/files`);
+    return this.http.get<DashboardUserFileEntry[]>(`${USER_PROJECT_BASE_URL}/${pid}/files`);
   }
 
   public getProjectFiles(): ReadonlyArray<DashboardUserFileEntry> {
@@ -47,36 +47,36 @@ export class UserProjectService {
       });
   }
 
-  public retrieveProject(pid: number) : Observable<Project>{
-    return this.http.get<Project>(`${PROJECT_BASE_URL}/` + pid);
+  public retrieveProject(pid: number) : Observable<UserProject>{
+    return this.http.get<UserProject>(`${USER_PROJECT_BASE_URL}/` + pid);
   }
 
   public updateProjectName(pid: number, name: string) : Observable<Response>{
-    return this.http.post<Response>(`${PROJECT_BASE_URL}/${pid}/rename/${name}`, {});
+    return this.http.post<Response>(`${USER_PROJECT_BASE_URL}/${pid}/rename/${name}`, {});
   }
 
   public deleteProject(pid: number): Observable<Response> {
     return this.http.delete<Response>(`${DELETE_PROJECT_URL}/` + pid);
   }
 
-  public createProject(name: string) : Observable<Project>{
-    return this.http.post<Project>(`${CREATE_PROJECT_URL}/` + name, {});
+  public createProject(name: string) : Observable<UserProject>{
+    return this.http.post<UserProject>(`${CREATE_PROJECT_URL}/` + name, {});
   }
 
   public addWorkflowToProject(pid: number, wid: number): Observable<Response>{
-    return this.http.post<Response>(`${PROJECT_BASE_URL}/${pid}/workflow/${wid}/add`, {});
+    return this.http.post<Response>(`${USER_PROJECT_BASE_URL}/${pid}/workflow/${wid}/add`, {});
   }
 
   public removeWorkflowFromProject(pid: number, wid: number): Observable<Response>{
-    return this.http.delete<Response>(`${PROJECT_BASE_URL}/${pid}/workflow/${wid}/delete`, {});
+    return this.http.delete<Response>(`${USER_PROJECT_BASE_URL}/${pid}/workflow/${wid}/delete`, {});
   }
 
   public addFileToProject(pid: number, fid: number): Observable<Response>{
-    return this.http.post<Response>(`${PROJECT_BASE_URL}/${pid}/user-file/${fid}/add`, {});
+    return this.http.post<Response>(`${USER_PROJECT_BASE_URL}/${pid}/user-file/${fid}/add`, {});
   }
 
   public removeFileFromProject(pid: number, fid: number): Observable<Response>{
-    return this.http.delete<Response>(`${PROJECT_BASE_URL}/${pid}/user-file/${fid}/delete`, {});
+    return this.http.delete<Response>(`${USER_PROJECT_BASE_URL}/${pid}/user-file/${fid}/delete`, {});
   }
 
   /**

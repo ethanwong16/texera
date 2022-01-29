@@ -105,7 +105,7 @@ export class UserProjectSectionComponent implements OnInit {
   }
 
   private isValidNewProjectName(newName: string, oldProject?: Project): boolean {
-    if (typeof oldProject === 'undefined') {
+    if (typeof oldProject === "undefined") {
       return newName.length != 0 && this.projectEntries.filter(project => project.name === newName).length === 0;
     } else {
       return newName.length != 0 && this.projectEntries.filter(project => project.pid !== oldProject.pid && project.name === newName).length === 0; 

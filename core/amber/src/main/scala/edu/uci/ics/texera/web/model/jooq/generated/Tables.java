@@ -13,6 +13,7 @@ import edu.uci.ics.texera.web.model.jooq.generated.tables.UserFileAccess;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.UserProject;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.Workflow;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowOfProject;
+import edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowExecutions;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowOfUser;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowUserAccess;
 import edu.uci.ics.texera.web.model.jooq.generated.tables.WorkflowVersion;
@@ -68,6 +69,11 @@ public class Tables {
      * The table <code>texera_db.workflow_of_project</code>.
      */
     public static final WorkflowOfProject WORKFLOW_OF_PROJECT = WorkflowOfProject.WORKFLOW_OF_PROJECT;
+
+    /**
+     * The table <code>texera_db.workflow_executions</code>.
+     */
+    public static final WorkflowExecutions WORKFLOW_EXECUTIONS = WorkflowExecutions.WORKFLOW_EXECUTIONS;
 
     /**
      * The table <code>texera_db.workflow_of_user</code>.

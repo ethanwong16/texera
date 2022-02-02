@@ -267,11 +267,11 @@ class ProjectResource {
   @POST
   @Path("/{pid}/rename/{name}")
   def updateProjectName(@PathParam("pid") pid: UInteger, @PathParam("name") name: String): Unit = {
-    val userProject = userProjectDao.fetchOneByPid(pid)
     if (name.isBlank) {
       throw new BadRequestException("Cannot rename project to empty or blank name.")
     }
 
+    val userProject = userProjectDao.fetchOneByPid(pid)
     try {
       userProject.setName(name)
       userProjectDao.update(userProject)

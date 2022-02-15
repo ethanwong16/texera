@@ -51,7 +51,7 @@ export class UserProjectListComponent implements OnInit {
     this.userProjectEntriesIsEditingName = this.userProjectEntriesIsEditingName.filter(index => index != pid);
   }
 
-  public saveProjectName(project: UserProject, newName: string, index: number): void {
+  public saveProjectName(project: UserProject, newName: string): void {
     // nothing happens if name is the same
     if (project.name === newName) {
       this.removeEditStatus(project.pid);
@@ -59,12 +59,18 @@ export class UserProjectListComponent implements OnInit {
       this.userProjectService
       .updateProjectName(project.pid, newName)
       .pipe(untilDestroyed(this))
-      .subscribe(() => {
-        this.removeEditStatus(project.pid);
-        this.getUserProjectArray(); // refresh list of projects, name is read only property so can"t edit
-      });
+      .subscribe(
+        () => {
+          this.removeEditStatus(project.pid);
+          this.getUserProjectArray(); // refresh list of projects, name is read only property so cannot edit
+        },
+        (err: unknown) => {
+          // @ts-ignore
+          this.notificationService.error(err.error.message);
+        }
+      );
     } else {
-      // show error message and don"t call backend
+      // show error message and do not call backend
       this.notificationService.error(`Cannot create project named: "${newName}".  It must be a non-empty, unique name`);
     }
   }
@@ -94,9 +100,13 @@ export class UserProjectListComponent implements OnInit {
        .pipe(untilDestroyed(this))
        .subscribe(
          (createdProject) => {
-          this.userProjectEntries.push(createdProject); // update local list of projects
-          this.unclickCreateButton();
-        }
+           this.userProjectEntries.push(createdProject); // update local list of projects
+           this.unclickCreateButton();
+          },
+          (err: unknown) => {
+            // @ts-ignore
+            this.notificationService.error(err.error.message);
+          }
       );
     } else {
       // show error message and don't call backend

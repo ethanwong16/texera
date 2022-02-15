@@ -10,9 +10,11 @@ import { DashboardWorkflowEntry } from "../../../type/dashboard-workflow-entry";
 import { UserService } from "../../../../common/service/user/user.service";
 import { UserProjectService } from "../../../service/user-project/user-project.service";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
-import { NotificationService } from "src/app/common/service/notification/notification.service";
+import { NotificationService } from "../../../../common/service/notification/notification.service";
 import Fuse from "fuse.js";
 import { concatMap, catchError } from "rxjs/operators";
+import { NgbdModalWorkflowExecutionsComponent } from "./ngbd-modal-workflow-executions/ngbd-modal-workflow-executions.component";
+import { environment } from "../../../../../environments/environment";
 
 export const ROUTER_WORKFLOW_BASE_URL = "/workflow";
 export const ROUTER_WORKFLOW_CREATE_NEW_URL = "/";
@@ -45,6 +47,8 @@ export class SavedWorkflowSectionComponent implements OnInit {
   public workflowSearchValue: string = "";
   private defaultWorkflowName: string = "Untitled Workflow";
   public searchCriteria: string[] = ["owner", "id"];
+  // whether tracking metadata information about executions is enabled
+  public workflowExecutionsTrackingEnabled: boolean = environment.workflowExecutionsTrackingEnabled;
 
   constructor(
     private userService: UserService,
@@ -64,6 +68,17 @@ export class SavedWorkflowSectionComponent implements OnInit {
    */
   public onClickOpenShareAccess({ workflow }: DashboardWorkflowEntry): void {
     const modalRef = this.modalService.open(NgbdModalWorkflowShareAccessComponent);
+    modalRef.componentInstance.workflow = workflow;
+  }
+
+  /**
+   * open the workflow executions page
+   */
+  public onClickGetWorkflowExecutions({ workflow }: DashboardWorkflowEntry): void {
+    const modalRef = this.modalService.open(NgbdModalWorkflowExecutionsComponent, {
+      size: "lg",
+      windowClass: "modal-xl",
+    });
     modalRef.componentInstance.workflow = workflow;
   }
 

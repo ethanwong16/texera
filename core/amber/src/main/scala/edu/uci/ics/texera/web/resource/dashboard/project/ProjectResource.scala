@@ -18,13 +18,13 @@ import edu.uci.ics.texera.web.model.jooq.generated.tables.daos.{
   WorkflowOfProjectDao
 }
 import edu.uci.ics.texera.web.model.jooq.generated.tables.pojos.{
+  File,
   FileOfProject,
+  UserFileAccess,
   UserProject,
   Workflow,
   WorkflowOfProject,
-  WorkflowUserAccess,
-  UserFileAccess,
-  File
+  WorkflowUserAccess
 }
 import edu.uci.ics.texera.web.resource.dashboard.project.ProjectResource.{
   context,
@@ -44,6 +44,7 @@ import javax.ws.rs.core.MediaType
 import java.util
 import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import io.dropwizard.auth.Auth
+import org.apache.commons.lang3.StringUtils
 
 import javax.annotation.security.PermitAll
 
@@ -279,11 +280,11 @@ class ProjectResource {
   @POST
   @Path("/{pid}/rename/{name}")
   def updateProjectName(@PathParam("pid") pid: UInteger, @PathParam("name") name: String): Unit = {
-    val userProject = userProjectDao.fetchOneByPid(pid)
-    if (name.isBlank) {
+    if (StringUtils.isBlank(name)) {
       throw new BadRequestException("Cannot rename project to empty or blank name.")
     }
 
+    val userProject = userProjectDao.fetchOneByPid(pid)
     try {
       userProject.setName(name)
       userProjectDao.update(userProject)

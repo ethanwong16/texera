@@ -113,6 +113,7 @@ import { NgbdModalRemoveProjectWorkflowComponent } from "./dashboard/component/f
 import { NgbdModalAddProjectFileComponent } from "./dashboard/component/feature-container/user-project-list/user-project-section/ngbd-modal-add-project-file/ngbd-modal-add-project-file.component";
 import { NgbdModalRemoveProjectFileComponent } from "./dashboard/component/feature-container/user-project-list/user-project-section/ngbd-modal-remove-project-file/ngbd-modal-remove-project-file.component";
 import { PresetWrapperComponent } from "./common/formly/preset-wrapper/preset-wrapper.component";
+import { NgbdModalWorkflowExecutionsComponent } from "./dashboard/component/feature-container/saved-workflow-section/ngbd-modal-workflow-executions/ngbd-modal-workflow-executions.component";
 
 registerLocaleData(en);
 
@@ -160,6 +161,7 @@ registerLocaleData(en);
     CodeEditorDialogComponent,
     TypeCastingDisplayComponent,
     NgbdModalWorkflowShareAccessComponent,
+    NgbdModalWorkflowExecutionsComponent,
     NgbdModalUserFileShareAccessComponent,
     ConsoleFrameComponent,
     ResultTableFrameComponent,
@@ -256,6 +258,7 @@ registerLocaleData(en);
     RowModalComponent,
     NgbdModalFileAddComponent,
     NgbdModalWorkflowShareAccessComponent,
+    NgbdModalWorkflowExecutionsComponent,
   ],
   providers: [
     UserService,

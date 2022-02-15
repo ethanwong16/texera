@@ -19,6 +19,7 @@ import edu.uci.ics.texera.web.resource.auth.{AuthResource, GoogleAuthResource}
 import edu.uci.ics.texera.web.resource.dashboard.file.{UserFileAccessResource, UserFileResource}
 import edu.uci.ics.texera.web.resource.dashboard.workflow.{
   WorkflowAccessResource,
+  WorkflowExecutionsResource,
   WorkflowResource,
   WorkflowVersionResource
 }
@@ -148,6 +149,7 @@ class TexeraWebApplication extends io.dropwizard.Application[TexeraWebConfigurat
     environment.jersey.register(classOf[WorkflowResource])
     environment.jersey.register(classOf[WorkflowVersionResource])
     environment.jersey.register(classOf[ProjectResource])
+    environment.jersey.register(classOf[WorkflowExecutionsResource])
   }
 
 }

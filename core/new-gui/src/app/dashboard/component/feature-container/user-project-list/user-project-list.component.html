@@ -55,7 +55,7 @@
                             <input
                               #editedName
                               (focusout)="removeEditStatus(dashboardUserProjectEntry.pid)"
-                              (keyup.enter)="saveProjectName(dashboardUserProjectEntry, editedName.value, i)"
+                              (keyup.enter)="saveProjectName(dashboardUserProjectEntry, editedName.value)"
                               placeholder="{{ dashboardUserProjectEntry.name }}"
                               value="{{ dashboardUserProjectEntry.name }}"
                             />

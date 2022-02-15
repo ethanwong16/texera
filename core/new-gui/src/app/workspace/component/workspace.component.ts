@@ -34,6 +34,7 @@ import { WorkflowCollabService } from "../service/workflow-collab/workflow-colla
   ],
 })
 export class WorkspaceComponent implements AfterViewInit, OnDestroy {
+  public pid: number = 0;
   public gitCommitHash: string = Version.raw;
   public showResultPanel: boolean = false;
   userSystemEnabled = environment.userSystemEnabled;
@@ -57,6 +58,21 @@ export class WorkspaceComponent implements AfterViewInit, OnDestroy {
     private operatorMetadataService: OperatorMetadataService,
     private message: NzMessageService
   ) {}
+
+  ngOnInit() {
+    /**
+     * On initialization of the workspace, there are two possibilities regarding which component has
+     * routed to this component:
+     * 
+     * 1. Routed to this component from within UserProjectSection component
+     *    - track the pid identifying that project
+     *    - upon persisting of a workflow, must also ensure it is also added to the project
+     * 
+     * 2. Routed to this component from SavedWorkflowSection component
+     *    - there is no related project
+     */
+    this.pid = this.route.snapshot.queryParams.pid ?? 0;
+  }
 
   ngAfterViewInit(): void {
     /**

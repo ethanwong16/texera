@@ -33,7 +33,7 @@ export const ROUTER_WORKFLOW_BASE_URL = "/workflow";
   styleUrls: ["./user-project-section.component.scss"]
 })
 export class UserProjectSectionComponent implements OnInit {
-  private pid: number = 0;
+  public pid: number = 0;
   public name: string = "";
   public ownerID: number = 0;
   public creationTime: number = 0;
@@ -256,7 +256,7 @@ export class UserProjectSectionComponent implements OnInit {
           this.userProjectService.refreshFilesOfProject(this.pid); // -- perform appropriate call for project page
         },
         (err: unknown) => {
-          // @ts-ignore // TODO: fix this with notification component
+          // @ts-ignore
           this.notificationService.error(err.error.message);
           this.userFileService.refreshDashboardUserFileEntries();
           this.userProjectService.refreshFilesOfProject(this.pid); // -- perform appropriate call for project page

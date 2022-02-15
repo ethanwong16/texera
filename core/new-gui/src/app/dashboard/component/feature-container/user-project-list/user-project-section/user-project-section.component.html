@@ -4,7 +4,7 @@
         <nz-card-meta nzDescription="Created: {{creationTime | date: 'yyyy-MM-dd HH:mm'}}"></nz-card-meta>
     </nz-card>
 
-    <nz-card> 
+    <!-- <nz-card> 
         <h2>Workflows</h2> 
         <button
             (click)="onClickOpenAddWorkflow()"
@@ -24,9 +24,9 @@
         >
             <i nz-icon nzTheme="outline" nzType="minus-square"></i>
         </button>
-    </nz-card>
+    </nz-card> -->
 
-    <nz-card class="workflow-list-container subsection-grid-container">
+    <!-- <nz-card class="workflow-list-container subsection-grid-container">
         <nz-list>
             <nz-list-item 
               *ngFor="let workflow of workflows;let i = index"
@@ -132,7 +132,9 @@
                 </ul>
             </nz-list-item>
         </nz-list>
-    </nz-card>
+    </nz-card> -->
+
+    <texera-saved-workflow-section [pid]="pid"></texera-saved-workflow-section>
 </div>
 
 <div> 

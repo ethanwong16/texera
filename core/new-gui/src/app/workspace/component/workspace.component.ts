@@ -24,6 +24,8 @@ import { isDefined } from "../../common/util/predicate";
 import { WorkflowCollabService } from "../service/workflow-collab/workflow-collab.service";
 import { UserProjectService } from "src/app/dashboard/service/user-project/user-project.service";
 
+export const SAVE_DEBOUNCE_TIME_IN_MS = 300;
+
 @UntilDestroy()
 @Component({
   selector: "texera-workspace",
@@ -128,7 +130,7 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
   registerAutoCacheWorkFlow(): void {
     this.workflowActionService
       .workflowChanged()
-      .pipe(debounceTime(100))
+      .pipe(debounceTime(SAVE_DEBOUNCE_TIME_IN_MS))
       .pipe(untilDestroyed(this))
       .subscribe(() => {
         this.workflowCacheService.setCacheWorkflow(this.workflowActionService.getWorkflow());
@@ -138,7 +140,7 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
   registerAutoPersistWorkflow(): void {
     this.workflowActionService
       .workflowChanged()
-      .pipe(debounceTime(100))
+      .pipe(debounceTime(SAVE_DEBOUNCE_TIME_IN_MS))
       .pipe(untilDestroyed(this))
       .subscribe(() => {
         if (

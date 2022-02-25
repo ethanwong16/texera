@@ -22,7 +22,6 @@ import { WorkflowVersionService } from "../../../dashboard/service/workflow-vers
 import { concatMap, catchError } from "rxjs/operators";
 import { UserProjectService } from "src/app/dashboard/service/user-project/user-project.service";
 import { WorkflowCollabService } from "../../service/workflow-collab/workflow-collab.service";
-import { delay } from "lodash";
 
 /**
  * NavigationComponent is the top level navigation bar that shows
@@ -71,7 +70,7 @@ export class NavigationComponent {
   public displayParticularWorkflowVersion: boolean = false;
   public onClickRunHandler: () => void;
 
-  // whether the disable operator button should be enabled
+  // whether the disable-operator-button should be enabled
   public isDisableOperatorClickable: boolean = false;
   public isDisableOperator: boolean = true;
 

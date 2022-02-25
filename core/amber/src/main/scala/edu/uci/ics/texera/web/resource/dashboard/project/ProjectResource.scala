@@ -255,7 +255,6 @@ class ProjectResource {
     if (!workflowOfProjectExists(wid, pid)) {
       workflowOfProjectDao.insert(new WorkflowOfProject(wid, pid))
     }
-    // TODO : should it return an error?
   }
 
   /**

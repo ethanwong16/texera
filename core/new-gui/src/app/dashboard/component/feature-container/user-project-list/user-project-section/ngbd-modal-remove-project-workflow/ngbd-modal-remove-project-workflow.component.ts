@@ -9,21 +9,18 @@ import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 @Component({
   selector: "texera-remove-project-workflow-modal",
   templateUrl: "./ngbd-modal-remove-project-workflow.component.html",
-  styleUrls: ["./ngbd-modal-remove-project-workflow.component.scss"]
+  styleUrls: ["./ngbd-modal-remove-project-workflow.component.scss"],
 })
 export class NgbdModalRemoveProjectWorkflowComponent implements OnInit {
-  @Input() addedWorkflows!: DashboardWorkflowEntry[];
   @Input() projectId!: number;
 
   public checkedWorkflows: boolean[] = [];
+  public addedWorkflows: DashboardWorkflowEntry[] = [];
 
-  constructor(
-    public activeModal: NgbActiveModal,
-    private userProjectService: UserProjectService
-  ) { }
+  constructor(public activeModal: NgbActiveModal, private userProjectService: UserProjectService) {}
 
   ngOnInit(): void {
-    this.checkedWorkflows = new Array(this.addedWorkflows.length).fill(false);
+    this.refreshProjectWorkflowEntries();
   }
 
   public submitForm() {
@@ -31,16 +28,18 @@ export class NgbdModalRemoveProjectWorkflowComponent implements OnInit {
 
     for (let index = this.checkedWorkflows.length - 1; index >= 0; --index) {
       if (this.checkedWorkflows[index]) {
-        observables.push(this.userProjectService.removeWorkflowFromProject(this.projectId, this.addedWorkflows[index].workflow.wid!));
+        observables.push(
+          this.userProjectService.removeWorkflowFromProject(this.projectId, this.addedWorkflows[index].workflow.wid!)
+        );
         this.addedWorkflows.splice(index, 1); // for updating frontend cache
       }
     }
 
     forkJoin(observables)
-       .pipe(untilDestroyed(this))
-       .subscribe(response => {
-         this.activeModal.close(this.addedWorkflows);
-        });
+      .pipe(untilDestroyed(this))
+      .subscribe(_ => {
+        this.activeModal.close(this.addedWorkflows);
+      });
   }
 
   public isAllChecked() {
@@ -53,5 +52,15 @@ export class NgbdModalRemoveProjectWorkflowComponent implements OnInit {
     } else {
       this.checkedWorkflows.fill(true);
     }
+  }
+
+  private refreshProjectWorkflowEntries(): void {
+    this.userProjectService
+      .retrieveWorkflowsOfProject(this.projectId)
+      .pipe(untilDestroyed(this))
+      .subscribe(dashboardWorkflowEntries => {
+        this.addedWorkflows = dashboardWorkflowEntries;
+        this.checkedWorkflows = new Array(this.addedWorkflows.length).fill(false);
+      });
   }
 }

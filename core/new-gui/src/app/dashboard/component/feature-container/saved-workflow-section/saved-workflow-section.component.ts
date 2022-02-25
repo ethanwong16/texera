@@ -6,6 +6,8 @@ import { from, Observable } from "rxjs";
 import { WorkflowPersistService } from "../../../../common/service/workflow-persist/workflow-persist.service";
 import { NgbdModalDeleteWorkflowComponent } from "./ngbd-modal-delete-workflow/ngbd-modal-delete-workflow.component";
 import { NgbdModalWorkflowShareAccessComponent } from "./ngbd-modal-share-access/ngbd-modal-workflow-share-access.component";
+import { NgbdModalAddProjectWorkflowComponent } from "../user-project-list/user-project-section/ngbd-modal-add-project-workflow/ngbd-modal-add-project-workflow.component";
+import { NgbdModalRemoveProjectWorkflowComponent } from "../user-project-list/user-project-section/ngbd-modal-remove-project-workflow/ngbd-modal-remove-project-workflow.component";
 import { DashboardWorkflowEntry } from "../../../type/dashboard-workflow-entry";
 import { UserService } from "../../../../common/service/user/user.service";
 import { UserProjectService } from "../../../service/user-project/user-project.service";
@@ -26,7 +28,7 @@ export const ROUTER_WORKFLOW_CREATE_NEW_URL = "/";
   styleUrls: ["./saved-workflow-section.component.scss", "../../dashboard.component.scss"],
 })
 export class SavedWorkflowSectionComponent implements OnInit {
-  @Input() private pid: number = 0;
+  @Input() public pid: number = 0;
   public dashboardWorkflowEntries: DashboardWorkflowEntry[] = [];
   public dashboardWorkflowEntriesIsEditingName: number[] = [];
   public allDashboardWorkflowEntries: DashboardWorkflowEntry[] = [];
@@ -80,6 +82,38 @@ export class SavedWorkflowSectionComponent implements OnInit {
       windowClass: "modal-xl",
     });
     modalRef.componentInstance.workflow = workflow;
+  }
+
+  /**
+   * open the Modal to add workflow(s) to project
+   */
+  public onClickOpenAddWorkflow() {
+    const modalRef = this.modalService.open(NgbdModalAddProjectWorkflowComponent);
+    modalRef.componentInstance.addedWorkflows = this.dashboardWorkflowEntries;
+    modalRef.componentInstance.projectId = this.pid;
+
+    // retrieve updated values from modal via promise
+    modalRef.result.then(result => {
+      if (result) {
+        this.updateDashboardWorkflowEntryCache(result);
+      }
+    });
+  }
+
+  /**
+   * open the Modal to remove workflow(s) from project
+   */
+  public onClickOpenRemoveWorkflow() {
+    const modalRef = this.modalService.open(NgbdModalRemoveProjectWorkflowComponent);
+    modalRef.componentInstance.addedWorkflows = this.dashboardWorkflowEntries;
+    modalRef.componentInstance.projectId = this.pid;
+
+    // retrieve updated values from modal via promise
+    modalRef.result.then(result => {
+      if (result) {
+        this.updateDashboardWorkflowEntryCache(result);
+      }
+    });
   }
 
   public searchInputOnChange(value: string): void {
@@ -202,24 +236,24 @@ export class SavedWorkflowSectionComponent implements OnInit {
     );
   }
 
-  // TODO : HAVE TO ADD CAPABILITY TO ADD / REMOVE WORKFLOW FROM PROJECT
   /**
    * create a new workflow. will redirect to a pre-emptied workspace
    */
   public onClickCreateNewWorkflowFromDashboard(): void {
-    this.router.navigate([`${ROUTER_WORKFLOW_CREATE_NEW_URL}`], { queryParams: { pid: this.pid }}).then(null);
+    this.router.navigate([`${ROUTER_WORKFLOW_CREATE_NEW_URL}`], { queryParams: { pid: this.pid } }).then(null);
   }
 
   /**
    * duplicate the current workflow. A new record will appear in frontend
    * workflow list and backend database.
-   * 
+   *
    * for workflow components inside a project-section, it will also add
    * the workflow to the project
    */
   public onClickDuplicateWorkflow({ workflow: { wid } }: DashboardWorkflowEntry): void {
     if (wid) {
-      if (this.pid == 0) { // not nested within user project section
+      if (this.pid == 0) {
+        // not nested within user project section
         this.workflowPersistService
           .duplicateWorkflow(wid)
           .pipe(untilDestroyed(this))
@@ -230,23 +264,25 @@ export class SavedWorkflowSectionComponent implements OnInit {
             // @ts-ignore
             (err: unknown) => this.notificationService.error(err.error.message)
           );
-      } else { // is nested within project section, also add duplicate workflow to project
+      } else {
+        // is nested within project section, also add duplicate workflow to project
         this.workflowPersistService
-        .duplicateWorkflow(wid)
-        .pipe(
-          concatMap((duplicatedWorkflowInfo: DashboardWorkflowEntry) => {
-            this.dashboardWorkflowEntries.push(duplicatedWorkflowInfo); 
-            return this.userProjectService.addWorkflowToProject(this.pid, duplicatedWorkflowInfo.workflow.wid!);
-          }),
-          catchError((err : unknown) => {
-            throw err;
-          }),
-          untilDestroyed(this))
-        .subscribe(
-          () => {},
-          // @ts-ignore
-          (err: unknown) => this.notificationService.error(err.error.message)
-        );
+          .duplicateWorkflow(wid)
+          .pipe(
+            concatMap((duplicatedWorkflowInfo: DashboardWorkflowEntry) => {
+              this.dashboardWorkflowEntries.push(duplicatedWorkflowInfo);
+              return this.userProjectService.addWorkflowToProject(this.pid, duplicatedWorkflowInfo.workflow.wid!);
+            }),
+            catchError((err: unknown) => {
+              throw err;
+            }),
+            untilDestroyed(this)
+          )
+          .subscribe(
+            () => {},
+            // @ts-ignore
+            (err: unknown) => this.notificationService.error(err.error.message)
+          );
       }
     }
   }
@@ -303,57 +339,43 @@ export class SavedWorkflowSectionComponent implements OnInit {
   }
 
   private refreshDashboardWorkflowEntries(): void {
-    // testing
-    let observable : Observable<DashboardWorkflowEntry[]>;
+    let observable: Observable<DashboardWorkflowEntry[]>;
 
-    if (this.pid === 0) { // not nested within user project section
+    if (this.pid === 0) {
+      // not nested within user project section
       observable = this.workflowPersistService.retrieveWorkflowsBySessionUser();
-    } else { // is nested within proejct section, get workflows belonging to project
+    } else {
+      // is nested within proejct section, get workflows belonging to project
       observable = this.userProjectService.retrieveWorkflowsOfProject(this.pid);
     }
 
-    observable
-      .pipe(untilDestroyed(this))
-      .subscribe(dashboardWorkflowEntries => {
-        this.dashboardWorkflowEntries = dashboardWorkflowEntries;
-        this.allDashboardWorkflowEntries = dashboardWorkflowEntries;
-        this.fuse.setCollection(this.allDashboardWorkflowEntries);
-        dashboardWorkflowEntries.forEach(dashboardWorkflowEntry => {
-          const workflow = dashboardWorkflowEntry.workflow;
-          this.filteredDashboardWorkflowNames.add(workflow.name);
-        });
+    observable.pipe(untilDestroyed(this)).subscribe(dashboardWorkflowEntries => {
+      this.dashboardWorkflowEntries = dashboardWorkflowEntries;
+      this.allDashboardWorkflowEntries = dashboardWorkflowEntries;
+      this.fuse.setCollection(this.allDashboardWorkflowEntries);
+      dashboardWorkflowEntries.forEach(dashboardWorkflowEntry => {
+        const workflow = dashboardWorkflowEntry.workflow;
+        this.filteredDashboardWorkflowNames.add(workflow.name);
       });
+    });
+  }
 
-
-    /*
-    if (this.pid === 0) { // not nested within user project section
-      this.workflowPersistService
-        .retrieveWorkflowsBySessionUser()
-        .pipe(untilDestroyed(this))
-        .subscribe(dashboardWorkflowEntries => {
-          this.dashboardWorkflowEntries = dashboardWorkflowEntries;
-          this.allDashboardWorkflowEntries = dashboardWorkflowEntries;
-          this.fuse.setCollection(this.allDashboardWorkflowEntries);
-          dashboardWorkflowEntries.forEach(dashboardWorkflowEntry => {
-            const workflow = dashboardWorkflowEntry.workflow;
-            this.filteredDashboardWorkflowNames.add(workflow.name);
-          });
-        });
-    } else { // is nested within project section, get workflows belonging to project
-      this.userProjectService
-        .retrieveWorkflowsOfProject(this.pid)
-        .pipe(untilDestroyed(this))
-        .subscribe(dashboardWorkflowEntries => {
-          this.dashboardWorkflowEntries = dashboardWorkflowEntries;
-          this.allDashboardWorkflowEntries = dashboardWorkflowEntries;
-          this.fuse.setCollection(this.allDashboardWorkflowEntries);
-          dashboardWorkflowEntries.forEach(dashboardWorkflowEntry => {
-            const workflow = dashboardWorkflowEntry.workflow;
-            this.filteredDashboardWorkflowNames.add(workflow.name);
-          });
-      });
-    }
-    */
+  /**
+   * Used for adding / removing workflow(s) from a project.
+   *
+   * Updates local caches to reflect what was pushed into backend / returned
+   * from the modal
+   *
+   * @param dashboardWorkflowEntries - returned local cache of workflows
+   */
+  private updateDashboardWorkflowEntryCache(dashboardWorkflowEntries: DashboardWorkflowEntry[]): void {
+    this.dashboardWorkflowEntries = dashboardWorkflowEntries;
+    this.allDashboardWorkflowEntries = dashboardWorkflowEntries;
+    this.fuse.setCollection(this.allDashboardWorkflowEntries);
+    dashboardWorkflowEntries.forEach(dashboardWorkflowEntry => {
+      const workflow = dashboardWorkflowEntry.workflow;
+      this.filteredDashboardWorkflowNames.add(workflow.name);
+    });
   }
 
   private clearDashboardWorkflowEntries(): void {

@@ -411,8 +411,8 @@ export class NavigationComponent {
             this.isSaving = false;
           }
         );
-    } else { // add new workflow to a project after its creation
-      // TODO : DON'T ADD WORKFLOW TO PROJECT IF MAPPING ALREADY EXISTS IN DATABASE
+    } else {
+      // add workflow to project, backend will create new mapping if not already added
       this.workflowPersistService
         .persistWorkflow(this.workflowActionService.getWorkflow())
         .pipe(
@@ -421,11 +421,11 @@ export class NavigationComponent {
             this.isSaving = false;
             return this.userProjectService.addWorkflowToProject(this.pid, updatedWorkflow.wid!);
           }),
-          catchError((err : unknown) => {
+          catchError((err: unknown) => {
             throw err;
           }),
           untilDestroyed(this)
-          )
+        )
         .subscribe(
           () => {},
           (error: unknown) => {

@@ -396,21 +396,21 @@ export class NavigationComponent {
       this.isSaving = true;
       if (this.pid === 0) {
         this.workflowPersistService
-        .persistWorkflow(this.workflowActionService.getWorkflow())
-        .pipe(untilDestroyed(this))
-        .subscribe(
-          (updatedWorkflow: Workflow) => {
-            this.workflowActionService.setWorkflowMetadata(updatedWorkflow);
-            this.isSaving = false;
-          },
-          (error: unknown) => {
-            alert(error);
-            this.isSaving = false;
-          }
-        );
+          .persistWorkflow(this.workflowActionService.getWorkflow())
+          .pipe(untilDestroyed(this))
+          .subscribe(
+            (updatedWorkflow: Workflow) => {
+              this.workflowActionService.setWorkflowMetadata(updatedWorkflow);
+              this.isSaving = false;
+            },
+            (error: unknown) => {
+              alert(error);
+              this.isSaving = false;
+            }
+          );
       } else {
-          // add workflow to project, backend will create new mapping if not already added
-          this.workflowPersistService
+        // add workflow to project, backend will create new mapping if not already added
+        this.workflowPersistService
           .persistWorkflow(this.workflowActionService.getWorkflow())
           .pipe(
             concatMap((updatedWorkflow: Workflow) => {

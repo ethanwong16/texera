@@ -49,12 +49,13 @@ $header-height: 120px;
 
 /**
 * the grid of the list of saved workflow. Each workflow contains the name, created time and last
-* edited time. This section is flexible to expand downward.
+* edited time. This section is flexible to expand downward and upwards (e.g. workflows add / removed from project)
 **/
 .workflow-list-container {
   grid-row-start: 2;
   grid-row-end: 3;
   overflow: auto;
+  min-height: 0%;
 
   .texera-dashboard-saved-workflow-search-box-input {
     margin-bottom: 30px;

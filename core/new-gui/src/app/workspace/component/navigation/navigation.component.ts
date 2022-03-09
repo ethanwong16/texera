@@ -1,6 +1,5 @@
 import { DatePipe, Location } from "@angular/common";
 import { Component, ElementRef, Input, ViewChild } from "@angular/core";
-import { TourService } from "ngx-tour-ng-bootstrap";
 import { environment } from "../../../../environments/environment";
 import { UserService } from "../../../common/service/user/user.service";
 import { WorkflowPersistService } from "../../../common/service/workflow-persist/workflow-persist.service";
@@ -17,6 +16,7 @@ import { merge } from "rxjs";
 import { WorkflowResultExportService } from "../../service/workflow-result-export/workflow-result-export.service";
 import { debounceTime } from "rxjs/operators";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
+import { WorkflowUtilService } from "../../service/workflow-graph/util/workflow-util.service";
 import { isSink } from "../../service/workflow-graph/model/workflow-graph";
 import { WorkflowVersionService } from "../../../dashboard/service/workflow-version/workflow-version.service";
 import { concatMap, catchError } from "rxjs/operators";
@@ -78,9 +78,10 @@ export class NavigationComponent {
   public isCacheOperatorClickable: boolean = false;
   public isCacheOperator: boolean = true;
 
+  public static readonly COLLAB_RELOAD_WAIT_TIME = 500;
+
   constructor(
     public executeWorkflowService: ExecuteWorkflowService,
-    public tourService: TourService,
     public workflowActionService: WorkflowActionService,
     public workflowWebsocketService: WorkflowWebsocketService,
     private location: Location,
@@ -92,8 +93,9 @@ export class NavigationComponent {
     private workflowCacheService: WorkflowCacheService,
     private datePipe: DatePipe,
     public workflowResultExportService: WorkflowResultExportService,
-    private userProjectService: UserProjectService,
-    public workflowCollabService: WorkflowCollabService
+    public workflowCollabService: WorkflowCollabService,
+    public workflowUtilService: WorkflowUtilService,
+    private userProjectService: UserProjectService
   ) {
     this.executionState = executeWorkflowService.getExecutionState().state;
     // return the run button after the execution is finished, either
@@ -209,6 +211,10 @@ export class NavigationComponent {
           onClick: () => {},
         };
     }
+  }
+
+  public onClickAddCommentBox(): void {
+    this.workflowActionService.addCommentBox(this.workflowUtilService.getNewCommentBox());
   }
 
   public handleKill(): void {
@@ -356,13 +362,9 @@ export class NavigationComponent {
    */
   public onClickDisableOperators(): void {
     if (this.isDisableOperator) {
-      this.effectivelyHighlightedOperators().forEach(op => {
-        this.workflowActionService.getTexeraGraph().disableOperator(op);
-      });
+      this.workflowActionService.disableOperators(this.effectivelyHighlightedOperators());
     } else {
-      this.effectivelyHighlightedOperators().forEach(op => {
-        this.workflowActionService.getTexeraGraph().enableOperator(op);
-      });
+      this.workflowActionService.enableOperators(this.effectivelyHighlightedOperators());
     }
   }
 
@@ -373,13 +375,9 @@ export class NavigationComponent {
     );
 
     if (this.isCacheOperator) {
-      effectiveHighlightedOperatorsExcludeSink.forEach(op => {
-        this.workflowActionService.getTexeraGraph().cacheOperator(op);
-      });
+      this.workflowActionService.cacheOperators(effectiveHighlightedOperatorsExcludeSink);
     } else {
-      effectiveHighlightedOperatorsExcludeSink.forEach(op => {
-        this.workflowActionService.getTexeraGraph().unCacheOperator(op);
-      });
+      this.workflowActionService.unCacheOperators(effectiveHighlightedOperatorsExcludeSink);
     }
   }
 
@@ -394,10 +392,10 @@ export class NavigationComponent {
   }
 
   public persistWorkflow(): void {
-    this.isSaving = true;
-
-    if (this.pid === 0) {
-      this.workflowPersistService
+    if (this.workflowCollabService.isLockGranted()) {
+      this.isSaving = true;
+      if (this.pid === 0) {
+        this.workflowPersistService
         .persistWorkflow(this.workflowActionService.getWorkflow())
         .pipe(untilDestroyed(this))
         .subscribe(
@@ -410,28 +408,29 @@ export class NavigationComponent {
             this.isSaving = false;
           }
         );
-    } else {
-      // add workflow to project, backend will create new mapping if not already added
-      this.workflowPersistService
-        .persistWorkflow(this.workflowActionService.getWorkflow())
-        .pipe(
-          concatMap((updatedWorkflow: Workflow) => {
-            this.workflowActionService.setWorkflowMetadata(updatedWorkflow);
-            this.isSaving = false;
-            return this.userProjectService.addWorkflowToProject(this.pid, updatedWorkflow.wid!);
-          }),
-          catchError((err: unknown) => {
-            throw err;
-          }),
-          untilDestroyed(this)
-        )
-        .subscribe(
-          () => {},
-          (error: unknown) => {
-            alert(error);
-            this.isSaving = false;
-          }
-        );
+      } else {
+          // add workflow to project, backend will create new mapping if not already added
+          this.workflowPersistService
+          .persistWorkflow(this.workflowActionService.getWorkflow())
+          .pipe(
+            concatMap((updatedWorkflow: Workflow) => {
+              this.workflowActionService.setWorkflowMetadata(updatedWorkflow);
+              this.isSaving = false;
+              return this.userProjectService.addWorkflowToProject(this.pid, updatedWorkflow.wid!);
+            }),
+            catchError((err: unknown) => {
+              throw err;
+            }),
+            untilDestroyed(this)
+          )
+          .subscribe(
+            () => {},
+            (error: unknown) => {
+              alert(error);
+              this.isSaving = false;
+            }
+          );
+      }
     }
   }
 
@@ -507,7 +506,7 @@ export class NavigationComponent {
     this.persistWorkflow();
     setTimeout(() => {
       this.workflowCollabService.requestOthersToReload();
-    }, 300);
+    }, NavigationComponent.COLLAB_RELOAD_WAIT_TIME);
   }
 
   /**

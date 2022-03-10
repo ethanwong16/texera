@@ -56,7 +56,7 @@ export class UserFileUploadService {
         this.uploadFile(fileUploadItem).subscribe(
           () => {
             this.removeFileFromUploadArray(fileUploadItem);
-            this.userFileService.refreshDashboardUserFileEntries();
+            // this.userFileService.refreshDashboardUserFileEntries();
           },
           (err: unknown) => {
             alert(

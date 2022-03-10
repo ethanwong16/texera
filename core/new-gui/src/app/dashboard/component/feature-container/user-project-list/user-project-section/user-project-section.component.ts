@@ -30,10 +30,10 @@ export const ROUTER_WORKFLOW_BASE_URL = "/workflow";
 @Component({
   selector: "texera-user-project-section",
   templateUrl: "./user-project-section.component.html",
-  styleUrls: ["./user-project-section.component.scss"],
+  styleUrls: ["./user-project-section.component.scss"]
 })
 export class UserProjectSectionComponent implements OnInit {
-  private pid: number = 0;
+  public pid: number = 0;
   public name: string = "";
   public ownerID: number = 0;
   public creationTime: number = 0;
@@ -54,7 +54,7 @@ export class UserProjectSectionComponent implements OnInit {
     private workflowPersistService: WorkflowPersistService,
     private userFileService: UserFileService,
     private notificationService: NotificationService
-  ) {}
+    ) { }
 
   ngOnInit(): void {
     // extract passed PID from parameter
@@ -75,7 +75,7 @@ export class UserProjectSectionComponent implements OnInit {
     modalRef.componentInstance.projectId = this.pid;
 
     // retrieve updated values from modal via promise
-    modalRef.result.then(result => {
+    modalRef.result.then((result) => {
       if (result) {
         this.workflows = result;
       }
@@ -88,7 +88,7 @@ export class UserProjectSectionComponent implements OnInit {
     modalRef.componentInstance.projectId = this.pid;
 
     // retrieve updated values from modal via promise
-    modalRef.result.then(result => {
+    modalRef.result.then((result) => {
       if (result) {
         this.workflows = result;
       }
@@ -127,7 +127,8 @@ export class UserProjectSectionComponent implements OnInit {
       });
   }
 
-  public getUserProjectFilesArray(): ReadonlyArray<DashboardUserFileEntry> {
+
+  public getUserProjectFilesArray() : ReadonlyArray<DashboardUserFileEntry>{
     const fileArray = this.userProjectService.getProjectFiles();
     if (!fileArray) {
       return [];
@@ -139,8 +140,13 @@ export class UserProjectSectionComponent implements OnInit {
     this.router.navigate([`${ROUTER_WORKFLOW_BASE_URL}/${wid}`]).then(null);
   }
 
+
   // ----------------- for workflow card
-  public confirmEditWorkflowName(dashboardWorkflowEntry: DashboardWorkflowEntry, name: string, index: number): void {
+  public confirmEditWorkflowName(
+    dashboardWorkflowEntry: DashboardWorkflowEntry,
+    name: string,
+    index: number
+  ): void {
     const { workflow } = dashboardWorkflowEntry;
     this.workflowPersistService
       .updateWorkflowName(workflow.wid, name || this.defaultWorkflowName)
@@ -162,7 +168,7 @@ export class UserProjectSectionComponent implements OnInit {
   /**
    * open the Modal based on the workflow clicked on
    */
-  public onClickOpenShareAccess({ workflow }: DashboardWorkflowEntry): void {
+   public onClickOpenShareAccess({ workflow }: DashboardWorkflowEntry): void {
     const modalRef = this.modalService.open(NgbdModalWorkflowShareAccessComponent);
     modalRef.componentInstance.workflow = workflow;
   }
@@ -170,7 +176,7 @@ export class UserProjectSectionComponent implements OnInit {
   /**
    * duplicate the current workflow. A new record will appear in frontend
    * workflow list and backend database.
-   *
+   * 
    * Modified to also add new workflow to project
    */
 
@@ -180,14 +186,13 @@ export class UserProjectSectionComponent implements OnInit {
         .duplicateWorkflow(wid)
         .pipe(
           concatMap((duplicatedWorkflowInfo: DashboardWorkflowEntry) => {
-            this.workflows.push(duplicatedWorkflowInfo);
+            this.workflows.push(duplicatedWorkflowInfo); 
             return this.userProjectService.addWorkflowToProject(this.pid, duplicatedWorkflowInfo.workflow.wid!);
           }),
-          catchError((err: unknown) => {
+          catchError((err : unknown) => {
             throw err;
           }),
-          untilDestroyed(this)
-        )
+          untilDestroyed(this))
         .subscribe(
           () => {},
           // @ts-ignore // TODO: fix this with notification component
@@ -202,7 +207,7 @@ export class UserProjectSectionComponent implements OnInit {
    * message to frontend and delete the workflow on frontend. It
    * calls the deleteProject method in service which implements backend API.
    */
-  public onClickDeleteWorkflow({ workflow }: DashboardWorkflowEntry): void {
+   public onClickDeleteWorkflow({ workflow }: DashboardWorkflowEntry): void {
     const modalRef = this.modalService.open(NgbdModalDeleteWorkflowComponent);
     modalRef.componentInstance.workflow = cloneDeep(workflow);
 
@@ -216,7 +221,9 @@ export class UserProjectSectionComponent implements OnInit {
             .pipe(untilDestroyed(this))
             .subscribe(
               _ => {
-                this.workflows = this.workflows.filter(workflowEntry => workflowEntry.workflow.wid !== wid);
+                this.workflows = this.workflows.filter(
+                  workflowEntry => workflowEntry.workflow.wid !== wid
+                );
               },
               // @ts-ignore // TODO: fix this with notification component
               (err: unknown) => alert(err.error)
@@ -225,12 +232,18 @@ export class UserProjectSectionComponent implements OnInit {
       });
   }
 
+
+
   // ----------------- for file card
   public addFileSizeUnit(fileSize: number): string {
     return this.userFileService.addFileSizeUnit(fileSize);
   }
 
-  public confirmEditFileName(dashboardUserFileEntry: DashboardUserFileEntry, name: string, index: number): void {
+  public confirmEditFileName(
+    dashboardUserFileEntry: DashboardUserFileEntry,
+    name: string,
+    index: number
+  ): void {
     const {
       file: { fid },
     } = dashboardUserFileEntry;
@@ -239,13 +252,13 @@ export class UserProjectSectionComponent implements OnInit {
       .pipe(untilDestroyed(this))
       .subscribe(
         () => {
-          this.userFileService.refreshDashboardUserFileEntries();
+          // this.userFileService.refreshDashboardFileEntries();
           this.userProjectService.refreshFilesOfProject(this.pid); // -- perform appropriate call for project page
         },
         (err: unknown) => {
-          // @ts-ignore // TODO: fix this with notification component
+          // @ts-ignore
           this.notificationService.error(err.error.message);
-          this.userFileService.refreshDashboardUserFileEntries();
+          // this.userFileService.refreshDashboardUserFileEntries();
           this.userProjectService.refreshFilesOfProject(this.pid); // -- perform appropriate call for project page
         }
       )
@@ -286,8 +299,8 @@ export class UserProjectSectionComponent implements OnInit {
   /**
    * Created new implementation in project service to
    * ensure files in the project page are refreshed
-   *
-   * @param userFileEntry
+   * 
+   * @param userFileEntry 
    */
   public deleteUserFileEntry(userFileEntry: DashboardUserFileEntry): void {
     this.userProjectService.deleteDashboardUserFileEntry(this.pid, userFileEntry);

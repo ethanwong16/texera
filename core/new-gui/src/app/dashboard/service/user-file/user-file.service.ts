@@ -20,11 +20,11 @@ export const USER_FILE_NAME_UPDATE_URL = `${USER_FILE_BASE_URL}/update/name`;
   providedIn: "root",
 })
 export class UserFileService {
-  private dashboardUserFileEntries: ReadonlyArray<DashboardUserFileEntry> = [];
+  // private dashboardUserFileEntries: ReadonlyArray<DashboardUserFileEntry> = [];
   private dashboardUserFileEntryChanged = new Subject<null>();
 
   constructor(private http: HttpClient, private userService: UserService) {
-    this.detectUserChanges();
+    // this.detectUserChanges();
   }
 
   /**
@@ -32,18 +32,24 @@ export class UserFileService {
    * This is required for HTML page since HTML can only loop through collection instead of index number.
    * You can change the UserFile inside the array but do not change the array itself.
    */
+  /*
   public getUserFiles(): ReadonlyArray<DashboardUserFileEntry> {
     return this.dashboardUserFileEntries;
-  }
+  }*/
 
   public getUserFilesChangedEvent(): Observable<null> {
     return this.dashboardUserFileEntryChanged.asObservable();
+  }
+
+  public updateUserFilesChangedEvent(): void {
+    this.dashboardUserFileEntryChanged.next();
   }
 
   /**
    * retrieve the files from the backend and store in the user-file service.
    * these file can be accessed by function {@link getFileArray}
    */
+  /*
   public refreshDashboardUserFileEntries(): void {
     if (!this.userService.isLogin()) {
       this.clearDashboardUserFileEntries();
@@ -52,15 +58,16 @@ export class UserFileService {
 
     this.retrieveDashboardUserFileEntryList().subscribe(dashboardUserFileEntries => {
       this.dashboardUserFileEntries = dashboardUserFileEntries;
-      this.dashboardUserFileEntryChanged.next(null);
+      this.dashboardUserFileEntryChanged.next();
     });
-  }
+  }*/
 
   /**
    * delete the targetFile in the backend.
    * this function will automatically refresh the files in the service when succeed.
    * @param targetUserFileEntry
    */
+  /*
   public deleteDashboardUserFileEntry(targetUserFileEntry: DashboardUserFileEntry): void {
     this.http
       .delete<Response>(`${USER_FILE_DELETE_URL}/${targetUserFileEntry.file.name}/${targetUserFileEntry.ownerName}`)
@@ -69,6 +76,10 @@ export class UserFileService {
         // @ts-ignore // TODO: fix this with notification component
         (err: unknown) => alert("Can't delete the file entry: " + err.error)
       );
+  }*/
+
+  public deleteDashboardUserFileEntry(targetUserFileEntry: DashboardUserFileEntry): Observable<Response> {
+    return this.http.delete<Response>(`${USER_FILE_DELETE_URL}/${targetUserFileEntry.file.name}/${targetUserFileEntry.ownerName}`);
   }
 
   /**
@@ -138,27 +149,31 @@ export class UserFileService {
     return this.http.get(requestURL, { responseType: "blob" });
   }
 
-  private retrieveDashboardUserFileEntryList(): Observable<ReadonlyArray<DashboardUserFileEntry>> {
+  // private retrieveDashboardUserFileEntryList(): Observable<ReadonlyArray<DashboardUserFileEntry>> {
+  //   return this.http.get<ReadonlyArray<DashboardUserFileEntry>>(`${USER_FILE_LIST_URL}`);
+  // }
+
+  public retrieveDashboardUserFileEntryList(): Observable<ReadonlyArray<DashboardUserFileEntry>> {
     return this.http.get<ReadonlyArray<DashboardUserFileEntry>>(`${USER_FILE_LIST_URL}`);
   }
 
   /**
    * refresh the files in the service whenever the user changes.
    */
-  private detectUserChanges(): void {
-    this.userService.userChanged().subscribe(() => {
-      if (this.userService.isLogin()) {
-        this.refreshDashboardUserFileEntries();
-      } else {
-        this.clearDashboardUserFileEntries();
-      }
-    });
-  }
+  // private detectUserChanges(): void {
+  //   this.userService.userChanged().subscribe(() => {
+  //     if (this.userService.isLogin()) {
+  //       this.refreshDashboardUserFileEntries();
+  //     } else {
+  //       this.clearDashboardUserFileEntries();
+  //     }
+  //   });
+  // }
 
-  private clearDashboardUserFileEntries(): void {
-    this.dashboardUserFileEntries = [];
-    this.dashboardUserFileEntryChanged.next(null);
-  }
+  // private clearDashboardUserFileEntries(): void {
+  //   this.dashboardUserFileEntries = [];
+  //   this.dashboardUserFileEntryChanged.next();
+  // }
 
   /**
    * updates the file name of a given userFileEntry

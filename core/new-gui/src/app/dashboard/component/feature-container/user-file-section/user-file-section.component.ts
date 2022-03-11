@@ -21,9 +21,7 @@ export class UserFileSectionComponent {
     private userFileService: UserFileService,
     private userService: UserService,
     private notificationService: NotificationService
-  ) {
-    // this.userFileService.refreshDashboardUserFileEntries();
-  }
+  ) {}
 
   ngOnInit() {
     this.registerDashboardFileEntriesRefresh();
@@ -32,7 +30,7 @@ export class UserFileSectionComponent {
   public dashboardUserFileEntries: ReadonlyArray<DashboardUserFileEntry> = [];
   public isEditingName: number[] = [];
   public userFileSearchValue: string = "";
-  public filteredFilenames: Set<string> = new Set();
+  public filteredFilenames: Array<string> = new Array();
   public isTyping: boolean = false;
   public fuse = new Fuse([] as ReadonlyArray<DashboardUserFileEntry>, {
     shouldSort: true,
@@ -43,7 +41,6 @@ export class UserFileSectionComponent {
     keys: ["file.name"],
   });
 
-  // TODO : should we pass data (instantaenous update) or do it as now?
   public openFileAddComponent() {
     const modalRef = this.modalService.open(NgbdModalFileAddComponent);
 
@@ -54,12 +51,11 @@ export class UserFileSectionComponent {
 
   public searchInputOnChange(value: string): void {
     this.isTyping = true;
-    this.filteredFilenames.clear();
-    // const fileArray = this.userFileService.getUserFiles();
+    this.filteredFilenames = [];
     const fileArray = this.dashboardUserFileEntries;
     fileArray.forEach(fileEntry => {
       if (fileEntry.file.name.toLowerCase().indexOf(value.toLowerCase()) !== -1) {
-        this.filteredFilenames.add(fileEntry.file.name);
+        this.filteredFilenames.push(fileEntry.file.name);
       }
     });
   }
@@ -69,9 +65,7 @@ export class UserFileSectionComponent {
     modalRef.componentInstance.dashboardUserFileEntry = dashboardUserFileEntry;
   }
 
-  // TODO : look into moving this ELSEIF logic into refreshing the user files
   public getFileArray(): ReadonlyArray<DashboardUserFileEntry> {
-    // const fileArray = this.userFileService.getUserFiles();
     const fileArray = this.dashboardUserFileEntries;
     if (!fileArray) {
       return [];
@@ -85,11 +79,13 @@ export class UserFileSectionComponent {
   }
 
   public deleteUserFileEntry(userFileEntry: DashboardUserFileEntry): void {
-    this.userFileService.deleteDashboardUserFileEntry(userFileEntry).subscribe(
-      () => this.refreshDashboardFileEntries(),
-      // @ts-ignore
-      (err: unknown) => this.notificationService.error("Can't delete the file entry: " + err.error.message)
-    );
+    this.userFileService.deleteDashboardUserFileEntry(userFileEntry).subscribe({
+      next: () => this.refreshDashboardFileEntries(),
+      error: (err: unknown) => {
+        // @ts-ignore
+        this.notificationService.error("Can't delete the file entry: " + err.error.message);
+      },
+    });
   }
 
   public disableAddButton(): boolean {
@@ -104,8 +100,8 @@ export class UserFileSectionComponent {
     this.userFileService
       .downloadUserFile(userFileEntry.file)
       .pipe(untilDestroyed(this))
-      .subscribe(
-        (response: Blob) => {
+      .subscribe({
+        next: (response: Blob) => {
           // prepare the data to be downloaded.
           const dataType = response.type;
           const binaryData = [];
@@ -119,11 +115,11 @@ export class UserFileSectionComponent {
           downloadLink.click();
           URL.revokeObjectURL(downloadLink.href);
         },
-        (err: unknown) => {
+        error: (err: unknown) => {
           // @ts-ignore
           this.notificationService.error(err.error.message);
-        }
-      );
+        },
+      });
   }
 
   public confirmUpdateFileCustomName(
@@ -137,40 +133,38 @@ export class UserFileSectionComponent {
     this.userFileService
       .updateFileName(fid, name)
       .pipe(untilDestroyed(this))
-      .subscribe(
-        // () => this.userFileService.refreshDashboardUserFileEntries(),
-        () => this.refreshDashboardFileEntries(),
-        (err: unknown) => {
+      .subscribe({
+        next: () => this.refreshDashboardFileEntries(),
+        error: (err: unknown) => {
           // @ts-ignore
           this.notificationService.error(err.error.message);
-          // this.userFileService.refreshDashboardUserFileEntries();
           this.refreshDashboardFileEntries();
-        }
-      )
+        },
+      })
       .add(() => (this.isEditingName = this.isEditingName.filter(fileIsEditing => fileIsEditing != index)));
   }
 
   private registerDashboardFileEntriesRefresh(): void {
-    this.userService.userChanged().pipe(untilDestroyed(this)).subscribe(() => {
-      if (this.userService.isLogin()) {
-        this.refreshDashboardFileEntries();
-      } else {
-        this.clearDashboardFileEntries();
-      }
-    });
+    this.userService
+      .userChanged()
+      .pipe(untilDestroyed(this))
+      .subscribe(() => {
+        if (this.userService.isLogin()) {
+          this.refreshDashboardFileEntries();
+        } else {
+          this.clearDashboardFileEntries();
+        }
+      });
   }
 
   private refreshDashboardFileEntries(): void {
-    // TODO1 : should it check for login / clearing here?
-    // if (!this.userService.isLogin()) {
-    //   this.clearDashboardFileEntries();
-    //   return;
-    // }
-    
-    this.userFileService.retrieveDashboardUserFileEntryList().pipe(untilDestroyed(this)).subscribe(dashboardUserFileEntries => {
-      this.dashboardUserFileEntries = dashboardUserFileEntries;
-      this.userFileService.updateUserFilesChangedEvent();
-    });
+    this.userFileService
+      .retrieveDashboardUserFileEntryList()
+      .pipe(untilDestroyed(this))
+      .subscribe(dashboardUserFileEntries => {
+        this.dashboardUserFileEntries = dashboardUserFileEntries;
+        this.userFileService.updateUserFilesChangedEvent();
+      });
   }
 
   private clearDashboardFileEntries(): void {

@@ -47,24 +47,22 @@ export class UserFileUploadService {
 
   /**
    * upload all the files in this service and then clear it.
-   * This method will automatically refresh the user-file service when any files finish uploading.
    */
   public uploadAllFiles(): void {
     this.filesToBeUploaded
       .filter(fileUploadItem => !fileUploadItem.isUploadingFlag)
       .forEach((fileUploadItem: FileUploadItem) =>
-        this.uploadFile(fileUploadItem).subscribe(
-          () => {
+        this.uploadFile(fileUploadItem).subscribe({
+          next: () => {
             this.removeFileFromUploadArray(fileUploadItem);
-            // this.userFileService.refreshDashboardUserFileEntries();
           },
-          (err: unknown) => {
+          error: (err: unknown) => {
             alert(
               // @ts-ignore // TODO: fix this with notification component
               `Uploading file ${fileUploadItem.name} failed\nMessage: ${err.error}`
             );
-          }
-        )
+          },
+        })
       );
   }
 

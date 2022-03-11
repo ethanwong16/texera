@@ -58,8 +58,6 @@ export class SourceTablesService {
 
     this.registerUpdateUserFileInFileSourceOp();
 
-    // this.userFileService.refreshDashboardUserFileEntries();
-
     this.registerOpPropertyDynamicUpdate();
 
     this.dynamicSchemaService.registerInitialSchemaTransformer((op, schema) => this.transformInitialSchema(op, schema));
@@ -165,52 +163,35 @@ export class SourceTablesService {
     }
   }
 
-  // private registerUpdateUserFileInFileSourceOp(): void {
-  //   this.userFileService.getUserFilesChangedEvent().subscribe(_ => {
-  //     this.userFileNames = this.userFileService.getUserFiles().map(file => `${file.ownerName}/${file.file.name}`);
-
-  //     Array.from(this.dynamicSchemaService.getDynamicSchemaMap().keys()).forEach(operatorID => {
-  //       const schema = this.dynamicSchemaService.getDynamicSchema(operatorID);
-  //       // if operator input attributes are in the result, set them in dynamic schema
-  //       const fileSchema = this.changeInputToEnumInJsonSchema(
-  //         schema,
-  //         fileNameInJsonSchema,
-  //         this.userFileNames,
-  //         "File Name"
-  //       );
-  //       if (!fileSchema) {
-  //         return;
-  //       }
-  //       if (!isEqual(schema, fileSchema)) {
-  //         SchemaPropagationService.resetAttributeOfOperator(this.workflowActionService, operatorID);
-  //         this.dynamicSchemaService.setDynamicSchema(operatorID, fileSchema);
-  //       }
-  //     });
-  //   });
-  // }
-
   private registerUpdateUserFileInFileSourceOp(): void {
-    this.userFileService.getUserFilesChangedEvent().pipe(concatMap(_ => {return this.userFileService.retrieveDashboardUserFileEntryList()})).subscribe(dashboardFileEntries => {
-      this.userFileNames = dashboardFileEntries.map(file => `${file.ownerName}/${file.file.name}`);
+    this.userFileService
+      .getUserFilesChangedEvent()
+      .pipe(
+        concatMap(_ => {
+          return this.userFileService.retrieveDashboardUserFileEntryList();
+        })
+      )
+      .subscribe(dashboardFileEntries => {
+        this.userFileNames = dashboardFileEntries.map(file => `${file.ownerName}/${file.file.name}`);
 
-      Array.from(this.dynamicSchemaService.getDynamicSchemaMap().keys()).forEach(operatorID => {
-        const schema = this.dynamicSchemaService.getDynamicSchema(operatorID);
-        // if operator input attributes are in the result, set them in dynamic schema
-        const fileSchema = this.changeInputToEnumInJsonSchema(
-          schema,
-          fileNameInJsonSchema,
-          this.userFileNames,
-          "File Name"
-        );
-        if (!fileSchema) {
-          return;
-        }
-        if (!isEqual(schema, fileSchema)) {
-          SchemaPropagationService.resetAttributeOfOperator(this.workflowActionService, operatorID);
-          this.dynamicSchemaService.setDynamicSchema(operatorID, fileSchema);
-        }
+        Array.from(this.dynamicSchemaService.getDynamicSchemaMap().keys()).forEach(operatorID => {
+          const schema = this.dynamicSchemaService.getDynamicSchema(operatorID);
+          // if operator input attributes are in the result, set them in dynamic schema
+          const fileSchema = this.changeInputToEnumInJsonSchema(
+            schema,
+            fileNameInJsonSchema,
+            this.userFileNames,
+            "File Name"
+          );
+          if (!fileSchema) {
+            return;
+          }
+          if (!isEqual(schema, fileSchema)) {
+            SchemaPropagationService.resetAttributeOfOperator(this.workflowActionService, operatorID);
+            this.dynamicSchemaService.setDynamicSchema(operatorID, fileSchema);
+          }
+        });
       });
-    });
   }
 
   private registerSourceTableFetch(): void {

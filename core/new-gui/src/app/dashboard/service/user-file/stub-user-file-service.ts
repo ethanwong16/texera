@@ -39,6 +39,10 @@ export class StubUserFileService implements PublicInterfaceOf<UserFileService> {
     return of();
   }
 
+  public updateUserFilesChangedEvent(): void {
+    return;
+  }
+
   /**
    * retrieve the files from the backend and store in the user-file service.
    * these file can be accessed by function {@link getFileArray}
@@ -84,7 +88,7 @@ export class StubUserFileService implements PublicInterfaceOf<UserFileService> {
   }
 
   /**
-   * retrieve the files from the backend 
+   * retrieve the files from the backend
    */
   public retrieveDashboardUserFileEntryList(): Observable<ReadonlyArray<DashboardUserFileEntry>> {
     return of();

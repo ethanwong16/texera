@@ -261,8 +261,8 @@ export class SavedWorkflowSectionComponent implements OnInit {
             (duplicatedWorkflowInfo: DashboardWorkflowEntry) => {
               this.dashboardWorkflowEntries.push(duplicatedWorkflowInfo);
             },
-            // @ts-ignore
-            (err: unknown) => this.notificationService.error(err.error.message)
+            // @ts-ignore // TODO: fix this with notification component
+            (err: unknown) => alert(err.error)
           );
       } else {
         // is nested within project section, also add duplicate workflow to project
@@ -280,8 +280,8 @@ export class SavedWorkflowSectionComponent implements OnInit {
           )
           .subscribe(
             () => {},
-            // @ts-ignore
-            (err: unknown) => this.notificationService.error(err.error.message)
+            // @ts-ignore // TODO: fix this with notification component
+            (err: unknown) => alert(err.error)
           );
       }
     }
@@ -311,8 +311,8 @@ export class SavedWorkflowSectionComponent implements OnInit {
                   workflowEntry => workflowEntry.workflow.wid !== wid
                 );
               },
-              // @ts-ignore
-              (err: unknown) => this.notificationService.error(err.error.message)
+              // @ts-ignore // TODO: fix this with notification component
+              (err: unknown) => alert(err.error)
             );
         }
       });

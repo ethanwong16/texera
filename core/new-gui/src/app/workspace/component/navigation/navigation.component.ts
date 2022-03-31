@@ -1,5 +1,5 @@
 import { DatePipe, Location } from "@angular/common";
-import { Component, ElementRef, Input, ViewChild } from "@angular/core";
+import { ChangeDetectorRef, Component, ElementRef, Input, OnInit, ViewChild } from "@angular/core";
 import { environment } from "../../../../environments/environment";
 import { UserService } from "../../../common/service/user/user.service";
 import { WorkflowPersistService } from "../../../common/service/workflow-persist/workflow-persist.service";
@@ -7,7 +7,6 @@ import { Workflow } from "../../../common/type/workflow";
 import { ExecuteWorkflowService } from "../../service/execute-workflow/execute-workflow.service";
 import { UndoRedoService } from "../../service/undo-redo/undo-redo.service";
 import { ValidationWorkflowService } from "../../service/validation/validation-workflow.service";
-import { WorkflowCacheService } from "../../service/workflow-cache/workflow-cache.service";
 import { JointGraphWrapper } from "../../service/workflow-graph/model/joint-graph-wrapper";
 import { WorkflowActionService } from "../../service/workflow-graph/model/workflow-action.service";
 import { ExecutionState } from "../../types/execute-workflow.interface";
@@ -44,7 +43,7 @@ import { WorkflowCollabService } from "../../service/workflow-collab/workflow-co
   templateUrl: "./navigation.component.html",
   styleUrls: ["./navigation.component.scss"],
 })
-export class NavigationComponent {
+export class NavigationComponent implements OnInit {
   public executionState: ExecutionState; // set this to true when the workflow is started
   public ExecutionState = ExecutionState; // make Angular HTML access enum definition
   public isWorkflowValid: boolean = true; // this will check whether the workflow error or not
@@ -90,12 +89,12 @@ export class NavigationComponent {
     public workflowPersistService: WorkflowPersistService,
     public workflowVersionService: WorkflowVersionService,
     public userService: UserService,
-    private workflowCacheService: WorkflowCacheService,
     private datePipe: DatePipe,
     public workflowResultExportService: WorkflowResultExportService,
     public workflowCollabService: WorkflowCollabService,
     public workflowUtilService: WorkflowUtilService,
-    private userProjectService: UserProjectService
+    private userProjectService: UserProjectService,
+    public changeDetectionRef: ChangeDetectorRef
   ) {
     this.executionState = executeWorkflowService.getExecutionState().state;
     // return the run button after the execution is finished, either
@@ -106,8 +105,10 @@ export class NavigationComponent {
     this.runDisable = initBehavior.disable;
     this.onClickRunHandler = initBehavior.onClick;
     // this.currentWorkflowName = this.workflowCacheService.getCachedWorkflow();
+  }
 
-    executeWorkflowService
+  public ngOnInit(): void {
+    this.executeWorkflowService
       .getExecutionStateStream()
       .pipe(untilDestroyed(this))
       .subscribe(event => {
@@ -116,7 +117,7 @@ export class NavigationComponent {
       });
 
     // set the map of operatorStatusMap
-    validationWorkflowService
+    this.validationWorkflowService
       .getWorkflowValidationErrorStream()
       .pipe(untilDestroyed(this))
       .subscribe(value => {
@@ -564,6 +565,7 @@ export class NavigationComponent {
       .pipe(untilDestroyed(this))
       .subscribe((lockGranted: boolean) => {
         this.lockGranted = lockGranted;
+        this.changeDetectionRef.detectChanges();
       });
   }
 

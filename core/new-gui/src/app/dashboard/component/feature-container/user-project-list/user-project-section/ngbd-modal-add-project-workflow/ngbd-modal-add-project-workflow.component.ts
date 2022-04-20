@@ -16,10 +16,10 @@ import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 export class NgbdModalAddProjectWorkflowComponent implements OnInit {
   @Input() projectId!: number;
 
-  public unaddedWorkflows: DashboardWorkflowEntry[] = [];
-  public checkedWorkflows: boolean[] = [];
-  private addedWorkflowKeys: Set<number> = new Set<number>();
-  private addedWorkflows: DashboardWorkflowEntry[] = [];
+  public unaddedWorkflows: DashboardWorkflowEntry[] = [];     // tracks which workflows to display, the ones that have not yet been added to the project
+  public checkedWorkflows: boolean[] = [];                    // used to implement check boxes
+  private addedWorkflowKeys: Set<number> = new Set<number>(); // tracks which workflows to NOT display,  the workflow IDs of the workflows (if any) already inside the project
+  private addedWorkflows: DashboardWorkflowEntry[] = [];      // for passing back to update the frontend cache, stores the new workflow list including newly added workflows
 
   constructor(
     public activeModal: NgbActiveModal,

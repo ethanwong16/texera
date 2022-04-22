@@ -249,14 +249,14 @@ export class SavedWorkflowSectionComponent implements OnInit {
       if (this.pid == 0) {
         // not nested within user project section
         this.workflowPersistService
-        .duplicateWorkflow(wid)
-        .pipe(untilDestroyed(this))
-        .subscribe({
-          next: duplicatedWorkflowInfo => {
-            this.dashboardWorkflowEntries = [...this.dashboardWorkflowEntries, duplicatedWorkflowInfo];
-          }, // TODO: fix this with notification component
-          error: (err: unknown) => alert(err),
-        });
+          .duplicateWorkflow(wid)
+          .pipe(untilDestroyed(this))
+          .subscribe({
+            next: duplicatedWorkflowInfo => {
+              this.dashboardWorkflowEntries = [...this.dashboardWorkflowEntries, duplicatedWorkflowInfo];
+            }, // TODO: fix this with notification component
+            error: (err: unknown) => alert(err),
+          });
       } else {
         // is nested within project section, also add duplicate workflow to project
         this.workflowPersistService

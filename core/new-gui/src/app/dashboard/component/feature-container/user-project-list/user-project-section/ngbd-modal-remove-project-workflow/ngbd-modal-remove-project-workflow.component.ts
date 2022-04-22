@@ -14,7 +14,7 @@ import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 export class NgbdModalRemoveProjectWorkflowComponent implements OnInit {
   @Input() projectId!: number;
 
-  public checkedWorkflows: boolean[] = [];              // used to implement check boxes
+  public checkedWorkflows: boolean[] = []; // used to implement check boxes
   public addedWorkflows: DashboardWorkflowEntry[] = []; // for passing back to update the frontend cache, stores the new workflow list with selected ones removed
 
   constructor(public activeModal: NgbActiveModal, private userProjectService: UserProjectService) {}
